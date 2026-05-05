@@ -1,0 +1,86 @@
+You are an expert full-stack developer specializing in creating maintainable, beginner-friendly web applications. Build the complete project exactly as described below.
+
+PROJECT NAME: HiSponsor (or Ether Career Platform) - Overseas Jobs, Visa Info, and Career Template Marketplace for Koreans.
+
+### STRICT RULES (MUST FOLLOW)
+- There MUST be a RULE.md file in the root. Strictly follow all guidelines in RULE.md (use the existing one if present, or create a comprehensive one covering code style, folder structure, etc.).
+- The entire codebase must be extremely well-documented so that a complete programming beginner can maintain, update, customize, and manage it.
+- Every single code file (JS/TS, CSS, HTML, components, etc.) must include DETAILED comments in BOTH Korean and English for every major section, function, component, and important logic. Comments should explain "what this does", "why", "how to customize", and "maintenance tips".
+- Generate TWO complete README files:
+  1. README.md (English version)
+  2. README_KO.md (Korean version)
+- Both READMEs must be extremely detailed, step-by-step, with screenshots descriptions if possible, and written for absolute beginners (no programming knowledge required).
+
+### TECH STACK (Modern, Simple, Maintainable)
+- Next.js 15+ (App Router) + TypeScript
+- Tailwind CSS
+- shadcn/ui + Radix UI components
+- Content Management: Use MDX or simple JSON/Supabase/Local files initially (easy to switch to CMS)
+- Multilingual: next-intl or i18next for KO/EN switching
+- Deployment ready for Vercel
+- Responsive, clean, modern futuristic/minimal design matching artistic brand (use provided logos)
+
+### SITE STRUCTURE
+Navigation (sticky top bar):
+- Logo (left)
+- Menu: Home | Info | Jobs | Template | Contact
+- Language Toggle: KO / EN (right)
+- Search (optional)
+
+Pages/Sections:
+
+1. **Home**:
+   - Hero section with logo, slogan, CTA buttons
+   - "Why we built this" explanation
+   - Features overview cards
+   - Recent Info / Jobs preview
+   - Call to action: "Have suggestions or issues? Contact us"
+
+2. **Info**:
+   - Visa & Country information list (filter by country, visa type)
+   - Detailed pages with rich content
+   - Comment system (use Disqus, Giscus, or simple local implementation)
+
+3. **Jobs**:
+   - Job listings with filters (country, job type, salary, etc.)
+   - Display AI-collected & processed jobs (mock data + easy import function)
+   - Detail pages with external links
+
+4. **Template** (Marketplace style):
+   - Resume / CV / Cover Letter template listings
+   - Cards with preview image, price (free/paid), description
+   - Detail page with "Download" or "Buy" button (Stripe test mode ready)
+   - Easy way for admin to add new templates
+
+5. **Contact**:
+   - Contact form
+   - Links, email, FAQ
+
+Additional Requirements:
+- Dark/Light mode support
+- Fast loading, SEO friendly (metadata)
+- Mobile-first responsive design
+- Easy customization points marked clearly in comments
+- Folder structure must be logical and well-explained in README
+
+### DELIVERABLES
+Generate the complete project structure with all files.
+- Include package.json with necessary dependencies
+- .env.example
+- Comprehensive RULE.md
+- README.md (English, very detailed for beginners)
+- README_KO.md (Korean, very detailed for beginners)
+- All code files with bilingual (Korean + English) detailed comments
+- Setup instructions in both READMEs: how to run locally, customize content, add new posts/jobs/templates, change languages, deploy to Vercel, maintenance guide
+
+### MAINTENANCE FOCUS
+- Content (posts, jobs, templates) should be easy to add via files or admin-like interface (no code changes needed for most updates)
+- Provide clear instructions on how a non-programmer can:
+  - Add new Info article
+  - Add new Job
+  - Add new Template
+  - Change text, colors, logos
+  - Update translations
+  - Deploy updates
+
+Start by creating the full project structure and all necessary files. Output in a clear, organized way. Begin implementation now.

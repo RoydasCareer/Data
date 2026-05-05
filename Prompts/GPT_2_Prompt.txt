@@ -1,0 +1,368 @@
+You MUST follow RULE.md strictly.
+
+# PROJECT: HiSponsor (AI-powered Global Job Sponsorship Blog Platform)
+
+## 🎯 Goal
+
+Build a fully automated AI-driven blog platform that:
+
+* Collects visa sponsorship job postings globally
+* Processes and structures them
+* Publishes SEO-optimized blog posts
+* Supports Korean and English
+* Is maintainable by NON-developers
+
+---
+
+# 🧠 SYSTEM ARCHITECTURE
+
+## Core Stack
+
+* Automation: Make.com
+* Database: Google Sheets
+* AI Processing:
+
+  * Processing: GPT / Gemini
+  * Validation: Claude
+  * Search: Perplexity
+* Version Control: GitHub
+* Hosting: Cloudflare Pages
+
+---
+
+# 🤖 AI AGENT SYSTEM
+
+## 1. PM Agent (Controller)
+
+* Controls workflow
+* Requests approval from user
+* Handles retry logic
+* Sends reports via Telegram
+
+## 2. Monitoring Agents (Multi-source)
+
+* Monitor:
+
+  * RSS feeds
+  * Job platforms
+  * Visa info sites
+* Detect new data
+* Send to raw_queue
+
+## 3. Collection Agent
+
+* Fetch HTML
+* Extract structured data using AI
+* Output JSON
+
+## 4. Processing Agent
+
+* Convert data into blog content
+* SEO optimized
+* Category-specific formatting
+
+## 5. Translation Agent
+
+* Korean → English
+* Natural translation
+* Preserve meaning
+
+## 6. Validation Agent (Read-only)
+
+* Grammar check
+* Fact check
+* Visa law validation
+* Structure validation
+* Reports issues ONLY
+
+## 7. Publishing Agent
+
+* Convert to Markdown
+* Push to GitHub
+* Trigger Cloudflare deployment
+
+## 8. Developer AI Agent
+
+* Weekly system analysis
+* Suggest improvements
+* Detect bottlenecks
+
+---
+
+# 🗂 DATABASE STRUCTURE (Google Sheets)
+
+## Spreadsheet: HiSponsor_Database
+
+### raw_queue
+
+id | source | url | title | detected_at | data_type | status | error_count
+
+### collected
+
+id | raw_id | data_type | source | company | job_title | location | visa_type | salary | raw_content | collected_at | status
+
+### processed
+
+id | collected_id | category | title_ko | title_en | body_ko | body_en | seo_keywords | quality_score | processed_by | processed_at | status
+
+### translated
+
+id | processed_id | title_ko | title_en | body_ko | body_en | translated_at | status
+
+### validated
+
+id | translated_id | final_score | grammar_ok | fact_ok | law_ok | structure_ok | validated_at | approved | approved_at | slug
+
+### rejected
+
+id | translated_id | fail_reason | rejected_at | retry_count | status
+
+### published
+
+id | validated_id | slug | github_path | published_at | url | category | status
+
+---
+
+# ⚙️ MAKE.COM IMPLEMENTATION RULES
+
+## Google Sheets Modules MUST be configured as:
+
+Connection:
+
+* Use Service Account
+
+Search Method:
+
+* Select from all (recommended)
+
+Spreadsheet Name:
+
+* HiSponsor_Database
+
+Sheet Name:
+
+* EXACT match (raw_queue, collected, etc.)
+
+Table contains headers:
+
+* YES
+
+Column range:
+
+* Leave EMPTY unless manual mode
+
+Filter:
+
+* Use conditions like:
+  url = {{item.link}}
+
+Limit:
+
+* 10~50 depending on load
+
+---
+
+# 🌐 DATA COLLECTION STRATEGY
+
+## Allowed (IMPORTANT)
+
+* RSS feeds
+* Public pages (no login)
+* robots.txt compliant scraping
+
+## Forbidden
+
+* Login scraping
+* API bypass
+* Protected content scraping
+
+---
+
+# 🧪 HTML → JSON EXTRACTION PROMPT
+
+Use this template:
+
+"Extract job posting data from HTML and return ONLY JSON:
+
+{
+"company": "",
+"job_title": "",
+"location": "",
+"visa_type": "",
+"salary": "",
+"description": ""
+}
+
+HTML:
+{{HTML_CONTENT}}"
+
+---
+
+# ✍️ BLOG GENERATION PROMPT
+
+"You are a global job blog writer.
+
+Write a Korean blog post:
+
+Include:
+
+* Job summary
+* Company info
+* Visa sponsorship details
+* Requirements
+* How to apply
+
+Return JSON:
+{
+"title_ko": "",
+"body_ko": "",
+"seo_keywords": "",
+"quality_score": 0
+}"
+
+---
+
+# 🌍 TRANSLATION PROMPT
+
+"You are a professional translator.
+
+Translate Korean to English:
+
+* Preserve meaning
+* Use natural tone
+* Keep markdown
+
+Return JSON:
+{
+"title_en": "",
+"body_en": ""
+}"
+
+---
+
+# 🔍 VALIDATION PROMPT
+
+"You are a strict validator.
+
+Check:
+
+* grammar_ok
+* fact_ok
+* law_ok
+* structure_ok
+* final_score
+* issues[]
+
+Return JSON ONLY"
+
+---
+
+# 🧾 MARKDOWN FORMAT
+
+---
+
+title: "{{title_ko}}"
+title_en: "{{title_en}}"
+slug: {{slug}}
+date: {{date}}
+category: {{category}}
+----------------------
+
+# {{title_ko}}
+
+{{body_ko}}
+
+---
+
+## English Version
+
+# {{title_en}}
+
+{{body_en}}
+
+---
+
+# 📘 README REQUIREMENTS
+
+## MUST INCLUDE BOTH:
+
+1. Korean README
+2. English README
+
+## MUST EXPLAIN:
+
+* Full system overview
+* How to run automation
+* How to modify prompts
+* How to manage Google Sheets
+* How to debug errors
+* How to scale system
+
+---
+
+# 🧾 CODE COMMENT RULE
+
+ALL CODE MUST INCLUDE:
+
+## Korean comment
+
+## English comment
+
+Example:
+
+// 한국어: 이 함수는 데이터를 처리합니다
+// English: This function processes data
+
+---
+
+# 🎨 FRONTEND STRUCTURE
+
+Pages:
+
+* Home
+* Info
+* Jobs
+* Template
+* Contact
+
+Features:
+
+* Fast loading (SSG)
+* SEO optimized
+* Language toggle (KO / EN)
+* Comment system (Info & Company pages)
+
+---
+
+# ⚡ PERFORMANCE RULES
+
+* Avoid unnecessary API calls
+* Use caching
+* Limit AI token usage
+* Batch processing
+
+---
+
+# 💡 FINAL RULE
+
+This system MUST:
+
+* Work with minimal cost (prefer free tier)
+* Be maintainable by NON-developers
+* Be modular and scalable
+
+---
+
+# OUTPUT REQUIREMENTS
+
+Generate:
+
+1. Full project structure
+2. All Make.com scenarios
+3. All prompts
+4. GitHub repo structure
+5. README (KR + EN)
+6. Example blog post
+7. Setup guide step-by-step
+
+Everything must be EXTREMELY detailed.

@@ -1,0 +1,766 @@
+================================================================================
+  HISPONSOR V4 — MASTER VIBE CODING PROMPT
+  Global Career Platform | Next.js + Supabase + Vercel
+  Version: 4.0 | Language: English
+  Last Updated: 2025
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ⚠️  MANDATORY: READ RULE.md FIRST — NO EXCEPTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before writing a single line of code, you MUST read and fully comply with
+the project's RULE.md file located in the root of the repository.
+RULE.md is the single source of truth for all coding standards.
+
+Summary of RULE.md requirements (do NOT skip these):
+  • You are an expert TypeScript / Next.js developer.
+  • MINIMAL  — Write the absolute minimum code needed. No over-engineering.
+  • SELF-DOCUMENTING — Use precise naming: verbs for functions, nouns for variables.
+                       Single-responsibility components. Obvious data flow.
+  • TYPE-EXACT — Strict TypeScript types. Zero use of `any`. Ever.
+  • SECURE    — Built-in security for auth and data handling at all times.
+  • PERFORMANT — Always follow Next.js optimization guides (ISR, SSR, lazy loading).
+  • PLAN FIRST — Before coding, write a <thinking> block:
+      1. Identify the core requirement.
+      2. Consider 3 implementation approaches.
+      3. Choose the simplest that fully meets the requirement.
+      4. Verify: Can this be split into smaller functions?
+                 Are there unnecessary abstractions?
+                 Will a junior developer (or non-programmer) understand this?
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 1 — PROJECT IDENTITY
+═══════════════════════════════════════════════════════════════════════════════
+
+Project Name  : HiSponsor
+Tagline       : "Your Global Career Starts Here"
+Mission       : A bilingual (Korean / English) platform that helps job seekers
+                find visa-sponsored jobs, learn about immigration, discover
+                resume templates, and connect with the community.
+Target Users  : Korean professionals seeking overseas jobs; foreigners seeking
+                jobs in Korea; career changers needing visa guidance.
+Brand Colors  : Primary Coral  #E8714A
+                Light Coral    #F5A080
+                Pale Coral     #FAE8DC (backgrounds)
+                Dark Text      #2D2926
+                Muted Text     #6B5E58
+                Border         #EDE0D9
+                Page BG        #FDFAF8
+                Success        #3DAA7E
+                Info Blue      #4A90D9
+                Warning Amber  #E8A020
+Brand Assets  : /public/assets/
+                  Horizontal_Logo.png  ← navbar logo
+                  Vertical_Logo.png    ← footer / OG image
+                  Web_Header_Banner.png← hero banner
+                  favicon-16x16.png
+                  favicon-32x32.png
+                  favicon-48x48.png
+                  HiSponsor_Image.png  ← general use
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 2 — TECHNOLOGY STACK (All Free to Start)
+═══════════════════════════════════════════════════════════════════════════════
+
+  Framework      : Next.js 15 (App Router, TypeScript)
+  Styling        : Tailwind CSS v3  +  shadcn/ui components
+  Database       : Supabase (PostgreSQL, free tier — 500 MB)
+  Auth           : Supabase Auth (email + Google OAuth)
+  Storage        : Supabase Storage (file uploads for templates)
+  Deployment     : Vercel (Hobby plan — free, unlimited deploys)
+  i18n           : next-intl  (Korean / English, URL-based routing)
+  Comments       : Giscus (GitHub Discussions — completely free)
+  Contact Form   : Supabase contacts table  OR  Formspree (free 50/month)
+  Email          : Resend (free 100 emails/day)
+  Automation     : GitHub Actions (free 2,000 minutes/month)
+  AI Posting     : Claude API — claude-haiku-4-5-20251001 (cost-optimized)
+  Job Aggregation: RSS Parser (feedparser)  +  GitHub Actions scheduler
+  Payments (v2)  : Toss Payments (Korean market, 3.3% fee — add in Phase 2)
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 3 — FOLDER STRUCTURE (Exact — Do Not Deviate)
+═══════════════════════════════════════════════════════════════════════════════
+
+  hisponsor/
+  │
+  ├── RULE.md                          ← Project coding rules (READ FIRST)
+  ├── README.md                        ← English README
+  ├── README.ko.md                     ← Korean README
+  ├── .env.local                       ← Secret keys (NEVER commit to git)
+  ├── .env.example                     ← Template for env vars (safe to commit)
+  ├── next.config.ts                   ← Next.js + next-intl config
+  ├── tailwind.config.ts               ← Tailwind + brand color tokens
+  ├── tsconfig.json
+  │
+  ├── messages/                        ← i18n translation files
+  │   ├── ko.json                      ← Korean text
+  │   └── en.json                      ← English text
+  │
+  ├── public/
+  │   └── assets/                      ← Brand images (logos, banners, favicon)
+  │
+  ├── src/
+  │   ├── app/
+  │   │   └── [locale]/               ← Dynamic locale route (ko | en)
+  │   │       ├── layout.tsx           ← Root layout (NavBar, Footer, LangSwitch)
+  │   │       ├── page.tsx             ← /  → Home page
+  │   │       ├── info/
+  │   │       │   ├── page.tsx         ← /info → Post list
+  │   │       │   └── [slug]/
+  │   │       │       └── page.tsx     ← /info/[slug] → Post detail + comments
+  │   │       ├── jobs/
+  │   │       │   ├── page.tsx         ← /jobs → Job list with filters
+  │   │       │   └── [slug]/
+  │   │       │       └── page.tsx     ← /jobs/[slug] → Job detail
+  │   │       ├── template/
+  │   │       │   ├── page.tsx         ← /template → Template gallery
+  │   │       │   └── [id]/
+  │   │       │       └── page.tsx     ← /template/[id] → Template detail
+  │   │       └── contact/
+  │   │           └── page.tsx         ← /contact → Contact form + FAQ
+  │   │
+  │   ├── components/
+  │   │   ├── layout/
+  │   │   │   ├── NavBar.tsx           ← Top navigation bar
+  │   │   │   ├── Footer.tsx           ← Site footer
+  │   │   │   └── LangSwitch.tsx       ← KO / EN toggle button (top-right)
+  │   │   ├── home/
+  │   │   │   ├── HeroBanner.tsx       ← Hero section with banner image
+  │   │   │   ├── WhySection.tsx       ← "Why HiSponsor" story block
+  │   │   │   ├── FeaturesGrid.tsx     ← Feature cards (Info/Jobs/Template)
+  │   │   │   ├── StatsBar.tsx         ← Live counts from Supabase
+  │   │   │   └── ContactCta.tsx       ← Bottom CTA banner
+  │   │   ├── info/
+  │   │   │   ├── PostCard.tsx         ← Info post preview card
+  │   │   │   ├── CategoryFilter.tsx   ← Visa/Country tab filter
+  │   │   │   └── GiscusComments.tsx   ← Embedded Giscus comment widget
+  │   │   ├── jobs/
+  │   │   │   ├── JobCard.tsx          ← Job listing card
+  │   │   │   ├── JobFilter.tsx        ← Country/Visa/Category filter bar
+  │   │   │   └── LastUpdated.tsx      ← "Last synced: X minutes ago" badge
+  │   │   ├── template/
+  │   │   │   ├── TemplateCard.tsx     ← Template preview card with price
+  │   │   │   └── UploadForm.tsx       ← Template upload form (Phase 2)
+  │   │   └── shared/
+  │   │       ├── SectionHeader.tsx    ← Reusable section title + subtitle
+  │   │       ├── EmptyState.tsx       ← "No results" illustration
+  │   │       └── LoadingSpinner.tsx   ← Loading state component
+  │   │
+  │   ├── lib/
+  │   │   ├── supabase.ts             ← Supabase client (browser)
+  │   │   ├── supabase-server.ts      ← Supabase client (server-side)
+  │   │   └── utils.ts               ← Shared helper functions
+  │   │
+  │   ├── types/
+  │   │   └── index.ts               ← All TypeScript interfaces & types
+  │   │
+  │   └── i18n/
+  │       ├── routing.ts             ← next-intl locale config
+  │       └── request.ts             ← Server-side locale detection
+  │
+  ├── .github/
+  │   └── workflows/
+  │       ├── collect-jobs.yml       ← Daily job aggregation (08:00 KST)
+  │       └── weekly-post.yml        ← Weekly AI Info post generation
+  │
+  └── scripts/
+      ├── collect_jobs.py            ← RSS/API job scraper + AI summary
+      └── generate_post.py           ← AI Info post generator (Claude API)
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 4 — NAVIGATION STRUCTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+  NavBar (fixed top, white background):
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  [🔥 HiSponsor logo]   Home  Info  Jobs  Template  Contact     │
+  │                                               [🇰🇷 KO] [🇺🇸 EN] │
+  └─────────────────────────────────────────────────────────────────┘
+
+  Rules:
+  • Logo: use Horizontal_Logo.png
+  • Active page link: color #E8714A, bold
+  • KO/EN button: top-right corner, always visible
+  • Mobile: hamburger menu, full-screen overlay
+  • Locale prefix in URL: /ko/jobs   /en/jobs
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 5 — PAGE-BY-PAGE SPECIFICATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────
+  5-A. HOME  (/[locale])
+────────────────────────────────────────
+  PURPOSE: First impression. Explain why HiSponsor exists. Guide users.
+
+  SECTIONS (top to bottom):
+  1. HeroBanner
+     - Background: Web_Header_Banner.png (full-width, height ~400px)
+     - Headline: t('home.hero.title')       ← from messages/[locale].json
+     - Subtext:  t('home.hero.subtitle')
+     - Buttons:  [Browse Jobs]  [Read Info]
+
+  2. WhySection
+     - Operator's personal message (written directly in messages JSON)
+     - Keep it human, honest, and short (3–5 sentences max)
+     - Show operator's avatar (optional) + name
+
+  3. FeaturesGrid  (3 columns → 1 column on mobile)
+     - Card 1: 📚 Info    — "Visa & country guides, updated weekly"
+     - Card 2: 💼 Jobs    — "Visa-sponsored jobs, auto-collected daily"
+     - Card 3: 📄 Template — "Free & paid CV templates from the community"
+
+  4. StatsBar  (live from Supabase count())
+     - Total Jobs  |  Info Posts  |  Templates  |  Countries Covered
+
+  5. ContactCta
+     - "Found a bug? Have a suggestion? We'd love to hear from you."
+     - [Contact Us] button
+
+  DO NOT add: Info post previews, Job card previews (keep Home clean).
+
+────────────────────────────────────────
+  5-B. INFO  (/[locale]/info)
+────────────────────────────────────────
+  PURPOSE: Visa & country-specific information with community comments.
+
+  LIST PAGE:
+  - CategoryFilter tabs: All | Visa | By Country (KR · US · CA · AU · DE …)
+  - PostCard grid: title, excerpt, date, country flag emoji, comment count
+  - Pagination or infinite scroll (10 posts per page)
+
+  DETAIL PAGE (/[locale]/info/[slug]):
+  - Full Markdown content (rendered via next-mdx-remote or react-markdown)
+  - Tags: visa type, country
+  - Share buttons (Twitter / Kakao)
+  - Giscus comments widget at bottom (GitHub Discussions)
+
+  SUPABASE TABLE: posts
+    id          UUID  PK
+    title_ko    TEXT  NOT NULL   ← Korean title
+    title_en    TEXT             ← English title (AI translated or manual)
+    content_ko  TEXT             ← Korean body (Markdown)
+    content_en  TEXT             ← English body
+    excerpt_ko  TEXT
+    excerpt_en  TEXT
+    category    TEXT             ← 'visa' | 'country' | 'news' | 'tip'
+    country     TEXT             ← 'KR' | 'US' | 'CA' | 'AU' | 'DE' | …
+    slug        TEXT  UNIQUE NOT NULL
+    is_ai_gen   BOOLEAN  DEFAULT false
+    is_active   BOOLEAN  DEFAULT true
+    created_at  TIMESTAMPTZ  DEFAULT NOW()
+
+────────────────────────────────────────
+  5-C. JOBS  (/[locale]/jobs)
+────────────────────────────────────────
+  PURPOSE: Auto-collected, AI-summarized job listings with visa sponsorship.
+
+  LIST PAGE:
+  - FilterBar: Country | Visa Sponsor (YES/NO) | Job Category | Employment Type
+  - JobCard: company, title, location, visa badge, "NEW" badge (<48h), apply link
+  - "Last synced: X minutes ago" badge (top-right of list)
+  - Empty state if no results match filters
+
+  DETAIL PAGE (/[locale]/jobs/[slug]):
+  - AI-generated 3-line summary (stored in description field)
+  - Original full listing link → [Apply Now] button (opens in new tab)
+  - Related jobs (same category, same country)
+
+  SUPABASE TABLE: jobs
+    id          UUID  PK
+    title       TEXT  NOT NULL
+    company     TEXT  NOT NULL
+    location    TEXT
+    country     TEXT
+    category    TEXT             ← 'tech' | 'finance' | 'marketing' | …
+    employment  TEXT             ← 'fulltime' | 'parttime' | 'contract'
+    description TEXT             ← AI-generated 3-line summary (Korean)
+    visa        BOOLEAN  DEFAULT false
+    salary      TEXT
+    apply_url   TEXT
+    slug        TEXT  UNIQUE NOT NULL
+    source      TEXT             ← 'remoteok' | 'indeed' | 'workinkorea' | …
+    is_active   BOOLEAN  DEFAULT true
+    created_at  TIMESTAMPTZ  DEFAULT NOW()
+
+  AUTO-COLLECTION (GitHub Actions — daily 08:00 KST):
+  - RSS sources: RemoteOK RSS, Indeed RSS (?q=visa+sponsorship)
+  - API sources: WorkInKorea official API (free)
+  - Dedup by: slug = MD5(apply_url)[:12]
+  - AI Summary: Claude Haiku API → 3-line Korean summary
+  - Save to: Supabase jobs table
+
+────────────────────────────────────────
+  5-D. TEMPLATE  (/[locale]/template)
+────────────────────────────────────────
+  PURPOSE: Marketplace for CV / Resume / Notion templates (buy & sell).
+
+  ⚠️  PHASE 1 (Start here): FREE TEMPLATES ONLY — no payment integration yet.
+      Display a gallery of free downloadable templates.
+      Upload via Supabase Storage.
+
+  ⚠️  PHASE 2 (Add later): Paid templates via Toss Payments.
+
+  LIST PAGE:
+  - Gallery grid (3 col desktop, 1 col mobile)
+  - TemplateCard: preview image, title, author, price (FREE / ₩ / $), rating
+  - Filter: Free Only | Paid | All | By Type (Resume / CV / Cover Letter / Notion)
+
+  DETAIL PAGE (/[locale]/template/[id]):
+  - Image carousel (preview screenshots)
+  - Description, compatible platforms (Notion / Word / PDF / Figma)
+  - Download button (Phase 1: direct link | Phase 2: after payment)
+  - Reviews & star ratings
+
+  SUPABASE TABLE: templates
+    id           UUID  PK
+    title_ko     TEXT
+    title_en     TEXT
+    description_ko TEXT
+    description_en TEXT
+    price        INTEGER  DEFAULT 0    ← 0 = free
+    currency     TEXT     DEFAULT 'KRW'
+    file_url     TEXT                  ← Supabase Storage URL
+    preview_urls TEXT[]                ← Array of screenshot URLs
+    platform     TEXT[]                ← ['notion','word','pdf']
+    seller_id    UUID  FK → auth.users
+    downloads    INTEGER  DEFAULT 0
+    is_active    BOOLEAN  DEFAULT true
+    created_at   TIMESTAMPTZ  DEFAULT NOW()
+
+  SUPABASE TABLE: reviews
+    id           UUID  PK
+    template_id  UUID  FK → templates
+    user_id      UUID  FK → auth.users
+    rating       INTEGER  CHECK (rating BETWEEN 1 AND 5)
+    comment      TEXT
+    created_at   TIMESTAMPTZ  DEFAULT NOW()
+
+────────────────────────────────────────
+  5-E. CONTACT  (/[locale]/contact)
+────────────────────────────────────────
+  PURPOSE: Receive inquiries, bug reports, content suggestions.
+
+  SECTIONS:
+  1. Contact Form
+     Fields: Name, Email, Inquiry Type (dropdown), Message
+     Inquiry Types: Job Posting Request | Template Upload | Bug Report |
+                    Content Suggestion | Partnership | Other
+     On submit: Insert into Supabase `contacts` table
+                + Send auto-reply via Resend
+
+  2. Contact Info block
+     - Email (obfuscated, not raw text — use JS rendering to prevent spam)
+     - Response time: "Within 24 hours on weekdays"
+     - Social links: Instagram, LinkedIn
+
+  3. FAQ accordion (6–8 most common questions, translated KO/EN)
+
+  SUPABASE TABLE: contacts
+    id          UUID  PK
+    name        TEXT  NOT NULL
+    email       TEXT  NOT NULL
+    subject     TEXT
+    message     TEXT  NOT NULL
+    type        TEXT             ← inquiry type value
+    status      TEXT  DEFAULT 'new'   ← 'new' | 'read' | 'replied'
+    created_at  TIMESTAMPTZ  DEFAULT NOW()
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 6 — INTERNATIONALIZATION (KO / EN)
+═══════════════════════════════════════════════════════════════════════════════
+
+  Library : next-intl
+  Install : npm install next-intl
+
+  URL pattern:
+    /ko          → Korean Home
+    /en          → English Home
+    /ko/jobs     → Korean Jobs
+    /en/jobs     → English Jobs
+
+  Locale detection:
+    Default locale : ko
+    Fallback       : en (if translation key missing)
+    Cookie-based   : yes (remember user preference)
+
+  File structure:
+    messages/ko.json   ← All Korean UI strings
+    messages/en.json   ← All English UI strings
+
+  LangSwitch component (top-right of NavBar):
+    - Shows current locale flag + code (🇰🇷 KO or 🇺🇸 EN)
+    - On click: switches locale, preserves current path
+    - Example: /ko/jobs → click EN → /en/jobs
+
+  Translation key naming convention:
+    {page}.{section}.{element}
+    Example: "jobs.filter.visaLabel": "비자 스폰서"
+
+  Database bilingual fields:
+    All content tables store both _ko and _en columns.
+    If _en is empty, fallback to _ko (no blank pages).
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 7 — COMMENTING RULES (MANDATORY IN ALL FILES)
+═══════════════════════════════════════════════════════════════════════════════
+
+  EVERY file must have bilingual comments (Korean + English).
+  This is NON-NEGOTIABLE. The project owner is not a programmer.
+  Comments must explain WHAT and WHY, not just HOW.
+
+  ──────────────────────────────────────
+  FORMAT FOR TYPESCRIPT / TSX / JS FILES
+  ──────────────────────────────────────
+
+  // ============================================================
+  // [파일 역할 한국어 설명 — 이 파일이 무엇을 하는지]
+  // [File role in English — what this file does]
+  // ============================================================
+  //
+  // 수정 방법 (How to customize):
+  //   한국어: [이 파일에서 수정하면 되는 것들]
+  //   English: [What can be changed in this file]
+  // ============================================================
+
+  Inside functions / components:
+  // 한국어: [이 함수/컴포넌트가 하는 일]
+  // English: [What this function/component does]
+
+  For each prop / variable:
+  // 한국어: [이 변수/prop의 역할]
+  // English: [Purpose of this variable/prop]
+
+  For each Supabase query:
+  // 한국어: [어떤 데이터를 가져오는지]
+  // English: [What data this query fetches and why]
+
+  ──────────────────────────────────────
+  FORMAT FOR PYTHON SCRIPTS
+  ──────────────────────────────────────
+
+  """
+  파일명: [filename]
+  역할 (KO): [이 스크립트가 무엇을 하는지]
+  Role (EN): [What this script does]
+
+  실행 방법 (How to run):
+    python scripts/[filename].py
+
+  수정 방법 (How to customize):
+    한국어: [수정할 수 있는 부분들]
+    English: [What parts can be changed]
+  """
+
+  ──────────────────────────────────────
+  FORMAT FOR YAML / WORKFLOW FILES
+  ──────────────────────────────────────
+
+  # ============================================================
+  # [워크플로우 이름] — [한국어 설명]
+  # [Workflow Name] — [English description]
+  #
+  # 실행 시점 (When it runs): [schedule description]
+  # 수동 실행 (Manual run): GitHub Actions → Run workflow
+  #
+  # 수정하는 방법 (How to change schedule):
+  #   cron: '0 23 * * *' = 매일 08:00 KST (Every day 08:00 KST)
+  #   cron: '0 0 * * 1'  = 매주 월요일 (Every Monday)
+  # ============================================================
+
+  ──────────────────────────────────────
+  FORMAT FOR JSON (messages files)
+  ──────────────────────────────────────
+
+  JSON does not support comments.
+  Instead, add a "_readme" key at the top:
+
+  {
+    "_readme": "이 파일은 한국어 UI 텍스트입니다. / This file contains Korean UI text. Edit the values (right side of :) to change displayed text.",
+    "nav": { ... }
+  }
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 8 — SUPABASE SETUP (SQL — Run in Order)
+═══════════════════════════════════════════════════════════════════════════════
+
+  Run these SQL statements in Supabase → SQL Editor → New Query:
+
+  ── STEP 1: Create all tables ───────────────────────────────────
+
+  -- 채용공고 테이블 / Job listings table
+  CREATE TABLE jobs (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title       TEXT NOT NULL,
+    company     TEXT NOT NULL,
+    location    TEXT,
+    country     TEXT,
+    category    TEXT,
+    employment  TEXT,
+    description TEXT,
+    visa        BOOLEAN DEFAULT false,
+    salary      TEXT,
+    apply_url   TEXT,
+    slug        TEXT UNIQUE NOT NULL,
+    source      TEXT,
+    is_active   BOOLEAN DEFAULT true,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 정보 게시물 테이블 / Info posts table (bilingual)
+  CREATE TABLE posts (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title_ko    TEXT NOT NULL,
+    title_en    TEXT,
+    content_ko  TEXT,
+    content_en  TEXT,
+    excerpt_ko  TEXT,
+    excerpt_en  TEXT,
+    category    TEXT,
+    country     TEXT,
+    slug        TEXT UNIQUE NOT NULL,
+    is_ai_gen   BOOLEAN DEFAULT false,
+    is_active   BOOLEAN DEFAULT true,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 템플릿 테이블 / Templates table
+  CREATE TABLE templates (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title_ko        TEXT,
+    title_en        TEXT,
+    description_ko  TEXT,
+    description_en  TEXT,
+    price           INTEGER DEFAULT 0,
+    currency        TEXT DEFAULT 'KRW',
+    file_url        TEXT,
+    preview_urls    TEXT[],
+    platform        TEXT[],
+    seller_id       UUID REFERENCES auth.users,
+    downloads       INTEGER DEFAULT 0,
+    is_active       BOOLEAN DEFAULT true,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 리뷰 테이블 / Reviews table
+  CREATE TABLE reviews (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_id UUID REFERENCES templates ON DELETE CASCADE,
+    user_id     UUID REFERENCES auth.users,
+    rating      INTEGER CHECK (rating BETWEEN 1 AND 5),
+    comment     TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 문의 테이블 / Contact submissions table
+  CREATE TABLE contacts (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name        TEXT NOT NULL,
+    email       TEXT NOT NULL,
+    subject     TEXT,
+    message     TEXT NOT NULL,
+    type        TEXT,
+    status      TEXT DEFAULT 'new',
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  ── STEP 2: Enable Row Level Security ───────────────────────────
+
+  ALTER TABLE jobs      ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE posts     ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE templates ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE reviews   ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE contacts  ENABLE ROW LEVEL SECURITY;
+
+  ── STEP 3: Set access policies ─────────────────────────────────
+
+  -- 누구나 읽기 허용 / Allow public read
+  CREATE POLICY "public_read_jobs"      ON jobs      FOR SELECT USING (true);
+  CREATE POLICY "public_read_posts"     ON posts     FOR SELECT USING (true);
+  CREATE POLICY "public_read_templates" ON templates FOR SELECT USING (true);
+  CREATE POLICY "public_read_reviews"   ON reviews   FOR SELECT USING (true);
+
+  -- 문의 등록은 누구나 / Allow anyone to submit contact
+  CREATE POLICY "public_insert_contacts" ON contacts FOR INSERT WITH CHECK (true);
+
+  -- 리뷰는 로그인 사용자만 / Only logged-in users can review
+  CREATE POLICY "auth_insert_reviews" ON reviews FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 9 — ENVIRONMENT VARIABLES (.env.local)
+═══════════════════════════════════════════════════════════════════════════════
+
+  Create .env.local in project root. NEVER commit this file.
+
+  # Supabase — get from supabase.com → Project Settings → API
+  NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...your-anon-key
+
+  # Supabase Service Key — only used in GitHub Actions / server scripts
+  SUPABASE_SERVICE_KEY=eyJhbGci...your-service-key
+
+  # Claude API — get from console.anthropic.com → API Keys
+  ANTHROPIC_API_KEY=sk-ant-...your-key
+
+  # Resend — get from resend.com → API Keys
+  RESEND_API_KEY=re_...your-key
+
+  # App URL — used for OG images, email links
+  NEXT_PUBLIC_URL=https://hisponsor.vercel.app
+
+  Also create .env.example (safe to commit — no real values):
+  NEXT_PUBLIC_SUPABASE_URL=
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=
+  SUPABASE_SERVICE_KEY=
+  ANTHROPIC_API_KEY=
+  RESEND_API_KEY=
+  NEXT_PUBLIC_URL=
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 10 — GITHUB ACTIONS (Automation)
+═══════════════════════════════════════════════════════════════════════════════
+
+  ── collect-jobs.yml ────────────────────────────────────────────
+  Trigger  : Daily at 08:00 KST  (cron: '0 23 * * *' in UTC)
+  Also     : Manual via "Run workflow" button in GitHub Actions tab
+  Script   : scripts/collect_jobs.py
+  What it does:
+    1. Fetch new jobs from RSS/API sources
+    2. Deduplicate by slug (MD5 of URL)
+    3. Generate AI summary via Claude Haiku
+    4. Insert new jobs into Supabase jobs table
+
+  ── weekly-post.yml ─────────────────────────────────────────────
+  Trigger  : Every Monday at 09:00 KST  (cron: '0 0 * * 1' in UTC)
+  Also     : Manual with optional topic input
+  Script   : scripts/generate_post.py
+  What it does:
+    1. Select topic from rotating list (or use manual input)
+    2. Generate Korean Info post via Claude API
+    3. Auto-translate to English via Claude
+    4. Insert into Supabase posts table (is_ai_gen: true)
+
+  GitHub Secrets required (Settings → Secrets → Actions → New):
+    ANTHROPIC_API_KEY
+    SUPABASE_URL
+    SUPABASE_SERVICE_KEY
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 11 — DEVELOPMENT PHASES
+═══════════════════════════════════════════════════════════════════════════════
+
+  PHASE 1 — Foundation (Now, Free)
+  ✅ Next.js project setup with next-intl
+  ✅ Supabase tables created
+  ✅ Home page (static content from messages JSON)
+  ✅ Info page (manual posts via Supabase dashboard)
+  ✅ Jobs page (manual posts, filters working)
+  ✅ Template page (free templates only, no payment)
+  ✅ Contact form → Supabase contacts table
+  ✅ KO/EN language switch
+  ✅ Deploy to Vercel
+
+  PHASE 2 — Automation (Month 1–2)
+  ✅ GitHub Actions: daily job collection
+  ✅ GitHub Actions: weekly AI post generation
+  ✅ Giscus comments on Info posts
+  ✅ Auto-reply email via Resend
+  ✅ Google Analytics 4 integration
+
+  PHASE 3 — Growth (Month 3–4)
+  ✅ Supabase Auth: user login (Google + Email)
+  ✅ Template upload form for sellers
+  ✅ Star ratings & reviews for templates
+  ✅ DeepL or Claude auto-translation for posts
+
+  PHASE 4 — Monetization (Month 5+)
+  ✅ Toss Payments for paid templates
+  ✅ Paid job listing submission by companies
+  ✅ AI-powered job matching (users get recommended jobs)
+  ✅ Weekly newsletter via Resend
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 12 — GENERAL CODING RULES FOR THIS PROJECT
+═══════════════════════════════════════════════════════════════════════════════
+
+  1. Always follow RULE.md first and above all.
+
+  2. EVERY component must have:
+     - JSDoc comment block above (bilingual: Korean + English)
+     - Prop types defined in src/types/index.ts (no inline types)
+     - A readable default export name matching the filename
+
+  3. All user-facing strings MUST come from messages/[locale].json.
+     Hard-coded strings in JSX are forbidden.
+
+  4. Supabase queries belong in:
+     - lib/supabase.ts (browser client, public data)
+     - lib/supabase-server.ts (server components, protected data)
+     Never write raw Supabase calls inside page or component files.
+
+  5. Images: always use next/image with explicit width and height.
+     All images must have alt text (translated via t() function).
+
+  6. Error handling: every async function must handle errors gracefully.
+     Show user-friendly error messages (translated), not raw error objects.
+
+  7. Mobile-first design:
+     - Default Tailwind classes = mobile layout
+     - md: and lg: prefixes = tablet and desktop overrides
+     - Minimum tap target: 44×44px for all interactive elements
+
+  8. Color usage: ONLY use brand colors defined in tailwind.config.ts.
+     No raw hex codes in JSX. Use: text-coral, bg-pale, border-brand, etc.
+
+  9. File naming:
+     - Components: PascalCase  (JobCard.tsx)
+     - Utilities:  camelCase   (formatDate.ts)
+     - Routes:     kebab-case  (page.tsx inside [slug] folder)
+
+  10. Git commit messages:
+      Format: [emoji] [scope]: [description]
+      Examples:
+        ✨ feat(jobs): add visa filter to job list
+        🐛 fix(nav): lang switch not preserving path
+        📝 docs: update README setup instructions
+        🤖 auto: weekly AI post generation
+
+═══════════════════════════════════════════════════════════════════════════════
+  SECTION 13 — HOW TO CUSTOMIZE (FOR NON-PROGRAMMERS)
+═══════════════════════════════════════════════════════════════════════════════
+
+  CHANGE SITE TEXT (words on the website):
+    → Edit messages/ko.json  (Korean)
+    → Edit messages/en.json  (English)
+    → Push to GitHub → Vercel auto-deploys in ~1 minute
+
+  ADD A JOB POSTING:
+    → Go to supabase.com → Table Editor → jobs → Insert row
+    → Fill: title, company, apply_url, slug (e.g. "google-engineer-2025")
+    → Set is_active = true → Save
+
+  ADD AN INFO POST:
+    → Go to supabase.com → Table Editor → posts → Insert row
+    → Fill: title_ko, content_ko, slug, category, country
+    → Set is_active = true → Save
+
+  CHANGE BRAND COLORS:
+    → Edit tailwind.config.ts → colors section
+    → Change the hex values only
+    → Push to GitHub → auto-deploy
+
+  ADD A PAGE SECTION:
+    → Ask Claude: "Add a [section name] section to the Home page in HiSponsor.
+      Follow the coding rules in RULE.md and add bilingual comments."
+
+  RUN AI AUTOMATION MANUALLY:
+    → GitHub.com → Your repo → Actions tab
+    → Click the workflow name → "Run workflow" button
+
+================================================================================
+  END OF PROMPT
+  Copy this entire file and paste it at the start of any AI coding session.
+  The AI will understand the full project context and build accordingly.
+================================================================================

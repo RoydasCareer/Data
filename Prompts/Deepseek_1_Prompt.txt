@@ -1,0 +1,22 @@
+project-root/
+├── .github/workflows/fetch-jobs.yml
+├── public/
+│   ├── locales/{ko,en}/common.json
+│   └── images/
+├── src/
+│   ├── app/
+│   │   ├── (routes)/ [home, info, jobs, templet, contact]
+│   │   ├── layout.tsx
+│   │   └── globals.css
+│   ├── components/
+│   ├── content/info/ (markdown files)
+│   ├── data/ (jobs.json, templates.json)
+│   ├── lib/ (rss-parser, i18n config, utils)
+│   └── types/
+├── RULE.md
+├── README.ko.md
+├── README.en.md
+├── package.json
+├── tailwind.config.js
+├── next.config.js
+└── tsconfig.json

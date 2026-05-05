@@ -1,0 +1,847 @@
+================================================================================
+  HISPONSOR — VIBE CODING MASTER PROMPT (Ver 4)
+  Global Visa Sponsorship Job Platform
+  Last Updated: 2025
+================================================================================
+
+READ THIS ENTIRE PROMPT BEFORE WRITING A SINGLE LINE OF CODE.
+Every rule below is non-negotiable. Confirm you understand before proceeding.
+
+--------------------------------------------------------------------------------
+  SECTION 0: MANDATORY RULE COMPLIANCE (RULE.md)
+--------------------------------------------------------------------------------
+
+You MUST follow RULE.md at all times. No exceptions.
+The RULE.md file is located in the root of the repository.
+Here is a summary — read the actual file for the full version:
+
+RULE 1 — Think Before Coding
+  - State your assumptions explicitly before writing code.
+  - If multiple interpretations exist, list them and ask before choosing.
+  - If something is unclear, STOP. Name what is confusing. Ask.
+  - Never silently assume. Never hide confusion.
+
+RULE 2 — Simplicity First
+  - Write the minimum code that solves the problem. Nothing more.
+  - No features that were not asked for.
+  - No abstractions for single-use code.
+  - No "just in case" error handling.
+  - If you write 200 lines and it could be 50, rewrite it.
+
+RULE 3 — Surgical Changes
+  - When editing existing code, touch ONLY the lines required.
+  - Do NOT improve, refactor, or reformat unrelated code.
+  - Match the existing style exactly, even if you prefer a different style.
+  - If you notice unrelated dead code, mention it in a comment — never delete it.
+  - Every changed line must trace directly back to the user's request.
+
+RULE 4 — Goal-Driven Execution
+  - Before starting any multi-step task, write a brief numbered plan:
+      1. [Step] → verify: [how to check it worked]
+      2. [Step] → verify: [how to check it worked]
+  - Define what "done" looks like before writing code.
+  - Strong success criteria = fewer rewrites.
+
+If you are ever unsure whether an action follows RULE.md, do not proceed.
+Ask the user first.
+
+--------------------------------------------------------------------------------
+  SECTION 1: PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+
+Project Name  : HiSponsor
+Tagline       : Global Visa Sponsorship Job Platform
+Target Users  : Korean professionals seeking jobs abroad with visa sponsorship
+Languages     : Korean (KO) and English (EN) — full bilingual support required
+Current Phase : MVP / Ver 4
+Repository    : https://github.com/RoydasCareer/Data
+
+What this platform does:
+  1. Aggregates visa-sponsored job listings from external sources (API, RSS, AI)
+  2. Provides visa and country information articles (with comments)
+  3. Hosts a marketplace for Resume / CV templates (upload & sell)
+  4. Provides a contact / feedback form for users
+
+Who maintains this:
+  - A single non-developer founder using AI tools (Claude, ChatGPT, Gemini)
+  - NO dedicated engineering team
+  - All code must be understandable and editable without programming knowledge
+
+--------------------------------------------------------------------------------
+  SECTION 2: TECHNICAL STACK
+--------------------------------------------------------------------------------
+
+Frontend  : Plain HTML + CSS + Vanilla JavaScript (NO React, NO TypeScript)
+            Reason: The maintainer is not a developer. Plain HTML is easiest to
+            edit with AI assistance. No build steps, no compilers, no npm.
+
+Styling   : Tailwind CSS via CDN (https://cdn.tailwindcss.com)
+            Custom CSS variables for brand colors (see Section 4)
+            Google Fonts via CDN (Outfit + Noto Sans KR)
+
+Backend   : Supabase (https://supabase.com)
+            - PostgreSQL database (jobs, posts, comments, templates, users)
+            - Supabase Auth (Google OAuth login)
+            - Supabase Storage (template file uploads, images)
+            - Supabase Realtime (live comment updates)
+
+Hosting   : Cloudflare Pages (https://pages.cloudflare.com)
+            - Free tier, unlimited bandwidth
+            - Connected directly to GitHub repository (auto-deploy on push)
+            - No build step required — static HTML files deploy directly
+
+Automation: n8n Cloud (https://n8n.io)
+            - Job collection workflow (runs daily at 03:00 KST)
+            - Claude AI translation workflow (job titles + descriptions → Korean)
+            - Email notification workflow (new matching jobs → subscribers)
+
+AI Tools  : Claude (claude.ai) — primary coding assistant
+            ChatGPT — content writing, marketing copy
+            Gemini — market research, translation review
+
+IMPORTANT: Do NOT introduce any of the following without explicit permission:
+  - React, Vue, Angular, Svelte, or any JS framework
+  - TypeScript (use plain JavaScript only)
+  - npm, pnpm, yarn, or any package manager
+  - Webpack, Vite, Parcel, or any bundler
+  - Any backend server (Node.js, Python, etc.) — use Supabase only
+
+--------------------------------------------------------------------------------
+  SECTION 3: FILE STRUCTURE
+--------------------------------------------------------------------------------
+
+hisponsor-web/                  ← Root of the GitHub repository
+│
+├── index.html                  ← Home page (/)
+├── info.html                   ← Info page (/info) — visa & country articles
+├── jobs.html                   ← Jobs page (/jobs) — job listings
+├── template.html               ← Template page (/template) — CV marketplace
+├── contact.html                ← Contact page (/contact) — inquiry form
+│
+├── _redirects                  ← Cloudflare Pages routing rules
+│
+├── assets/
+│   ├── css/
+│   │   └── style.css           ← Shared global CSS (variables, nav, footer)
+│   ├── js/
+│   │   ├── supabase.js         ← Supabase client initialization
+│   │   ├── i18n.js             ← KO/EN language toggle logic
+│   │   ├── nav.js              ← Navigation & active state logic
+│   │   ├── jobs.js             ← Jobs page: fetch + filter + render
+│   │   ├── info.js             ← Info page: fetch posts + comments
+│   │   ├── template.js         ← Template page: fetch + upload + purchase
+│   │   └── contact.js          ← Contact page: form submission
+│   └── images/
+│       ├── logo-horizontal.png
+│       ├── logo-vertical.png
+│       └── favicon.ico
+│
+├── README.md                   ← English README (full guide for non-developers)
+├── README_KO.md                ← Korean README (full guide for non-developers)
+├── RULE.md                     ← Coding rules (DO NOT MODIFY)
+└── .env.example                ← Example environment variables (NO real keys)
+
+--------------------------------------------------------------------------------
+  SECTION 4: BRAND DESIGN SYSTEM
+--------------------------------------------------------------------------------
+
+Color Variables (define in :root in style.css):
+  --color-coral:        #F07B5A   ← Primary brand color (buttons, accents)
+  --color-peach:        #FFF5F2   ← Light background / hover states
+  --color-dark:         #23201E   ← Primary text color
+  --color-mid:          #6B6460   ← Secondary text / labels
+  --color-light:        #FDFAF8   ← Page background
+  --color-border:       #EDE8E4   ← Default border color
+  --color-gold:         #F5A623   ← Accent (badges, highlights)
+  --color-success:      #2E7D32   ← Green (visa confirmed, free badge)
+  --color-info:         #1565C0   ← Blue (remote, info badges)
+
+Typography:
+  Font families: 'Outfit' (headings, UI), 'Noto Sans KR' (Korean text)
+  Load via: https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700
+
+Logo files:
+  Horizontal: /assets/images/logo-horizontal.png  ← Use in nav bar
+  Vertical:   /assets/images/logo-vertical.png    ← Use in footer / hero
+  Favicon:    /assets/images/favicon.ico
+
+--------------------------------------------------------------------------------
+  SECTION 5: PAGE-BY-PAGE SPECIFICATIONS
+--------------------------------------------------------------------------------
+
+────────────────────────────────────────────────────────
+  PAGE 1: HOME (index.html)
+────────────────────────────────────────────────────────
+
+Purpose:
+  Explain why this site was built, what it does, and invite feedback.
+  This is the first impression — keep it clean, warm, and honest.
+
+Sections (in order, top to bottom):
+  1. Sticky navigation bar (shared component — see Section 6)
+  2. Hero section
+     - Large headline: "비자 스폰서 채용 공고 한곳에서" / "Find Visa Sponsorship Jobs Here"
+     - Subheadline: Brief mission statement (2–3 lines)
+     - Two CTA buttons: "채용 공고 보기 →" / "비자 정보 알아보기"
+     - Three stat counters: job count, country count, sponsor company count
+       (Values are hardcoded initially; later fetched from Supabase COUNT queries)
+  3. "Why we built this" section
+     - Honest personal story: searching for visa info was scattered and hard
+     - 3 feature cards: (1) Auto job collection, (2) Visa & country info, (3) CV templates
+  4. Feedback CTA banner
+     - "More features needed or found a bug? Let us know"
+     - Single button linking to /contact
+  5. Footer (shared component — see Section 6)
+
+Content rules for Home:
+  - NO job listings on this page (they are on jobs.html)
+  - NO complex animations or carousels
+  - Text must be short and readable on mobile
+  - The personal story should feel genuine, not corporate
+
+────────────────────────────────────────────────────────
+  PAGE 2: INFO (info.html)
+────────────────────────────────────────────────────────
+
+Purpose:
+  A blog-style page for visa and country information articles.
+  Admins can write and publish posts. Users can leave comments.
+
+Sections:
+  1. Navigation bar
+  2. Page header: "비자 & 국가 정보" / "Visa & Country Info"
+     - Description: 2 lines explaining what this section contains
+     - "Write a Post" button (visible only to authenticated admin users)
+  3. Country filter pills (horizontal scroll on mobile):
+     All / 🇺🇸 USA / 🇬🇧 UK / 🇩🇪 Germany / 🇯🇵 Japan / 🇨🇦 Canada / 🇦🇺 Australia
+     + "Visa Type" filter (H1B / EU Blue Card / Work Visa / etc.)
+  4. Post grid (2 columns on desktop, 1 column on mobile)
+     Each post card shows:
+       - Country flag emoji as thumbnail background
+       - Category badges (visa type, country)
+       - Post title
+       - Preview text (first 100 characters of body)
+       - Post date
+       - Comment count pill ("💬 24 comments")
+       - Click → opens full post detail page (info-detail.html?id=XXX)
+  5. Post detail page (info-detail.html):
+     - Full article content (stored as Markdown in Supabase, rendered as HTML)
+     - Table of contents (auto-generated from H2/H3 headings)
+     - Comment section at the bottom:
+         - Display all approved comments (fetched from Supabase)
+         - Comment form: name + email + message (no login required initially)
+         - Comments visible immediately after submission (optimistic UI)
+         - Admin can delete comments via Supabase dashboard
+  6. Footer
+
+Supabase tables used:
+  - posts (id, title_ko, title_en, body_ko, body_en, country, visa_type,
+           author_id, published, created_at, updated_at, thumbnail_emoji)
+  - comments (id, post_id, author_name, author_email, body, created_at, approved)
+
+────────────────────────────────────────────────────────
+  PAGE 3: JOBS (jobs.html)
+────────────────────────────────────────────────────────
+
+Purpose:
+  Display visa-sponsored job listings that are automatically collected
+  from external sources via AI, APIs, and RSS feeds.
+
+Sections:
+  1. Navigation bar
+  2. Page header: "비자 스폰서십 채용" / "Visa Sponsorship Jobs"
+  3. AI collection notice banner:
+     - Show: "🤖 AI auto-collects from LinkedIn, RemoteOK, Arbeitnow daily
+       → Claude translates → saved to DB"
+     - This builds trust and explains where the data comes from
+  4. Filter row:
+     Country: All / USA / UK / DE / CA / AU / JP / SG
+     Type: Visa Sponsor Only / Remote OK / Full-time / Contract
+     Category: Engineering / Data / Design / PM / DevOps / Finance
+  5. Job list (vertical card list, not grid — easier to scan on mobile)
+     Each job row shows:
+       - Company logo placeholder (emoji or initials)
+       - Job title (bold, large)
+       - Company name + country flag + city
+       - Badges: "Visa Sponsor ✓" / "Remote OK" / "🔥 Hot"
+       - Salary range (right-aligned)
+       - Days since posted (right-aligned)
+       - Click → opens apply URL in new tab (tracked in Supabase for analytics)
+  6. Pagination or "Load More" button (load 20 jobs at a time from Supabase)
+  7. Footer
+
+Supabase table used:
+  - jobs (id, title, title_ko, company, company_logo, location, country,
+          category, description, description_ko, visa_sponsored boolean,
+          visa_types text[], salary_min, salary_max, salary_currency,
+          employment_type, remote_ok boolean, apply_url, source_site,
+          slug, is_featured, is_active, created_at, updated_at)
+
+Automatic job collection (n8n workflow — NOT part of this HTML file):
+  Step 1: Schedule trigger (daily 03:00 KST)
+  Step 2: HTTP GET https://www.arbeitnow.com/api/job-board-api  (visa filter)
+           HTTP GET https://remotive.com/api/remote-jobs
+           HTTP GET https://jobicy.com/api/v2/remote-jobs
+  Step 3: Claude API call → translate title + description to Korean
+  Step 4: Deduplicate against existing jobs in Supabase (check apply_url)
+  Step 5: Insert new jobs into Supabase jobs table
+  Step 6: Set is_active = false for jobs older than 60 days
+
+────────────────────────────────────────────────────────
+  PAGE 4: TEMPLATE (template.html)
+────────────────────────────────────────────────────────
+
+Purpose:
+  A marketplace where community members can upload and sell
+  Resume / CV templates (Notion, Google Docs, Word, Figma formats).
+
+Sections:
+  1. Navigation bar
+  2. Page header: "이력서 & CV 템플릿 마켓" / "Resume & CV Template Market"
+     - Subtitle: "Community-created, community-verified templates"
+     - "Upload My Template" button (requires login)
+  3. Template grid (3 columns desktop, 2 columns tablet, 1 column mobile)
+     Each template card shows:
+       - Visual preview (a styled mock document thumbnail — CSS only)
+       - Template name (bilingual)
+       - Author username
+       - Platform badge (Notion / Google Docs / Word / Figma)
+       - Price ($0.00 = "Free" in green, otherwise show price in coral)
+       - Buy / Download button
+       - Click on card → open preview modal or external preview link
+  4. Upload zone at the bottom:
+     - Dashed border drop zone
+     - "Upload your template" CTA
+     - Supported formats: Notion share link, Google Docs link, .docx, .pdf, Figma link
+     - Form fields: template name (KO + EN), description, price, platform, preview image
+     - Submissions go into Supabase "templates" table with status = "pending"
+     - Admin reviews and approves via Supabase dashboard (set status = "approved")
+  5. Footer
+
+Supabase table used:
+  - templates (id, name_ko, name_en, description_ko, description_en,
+               author_id, author_username, platform, price_usd,
+               preview_url, download_url, status, downloads int,
+               created_at, updated_at)
+
+Payment (Phase 2 — not in MVP):
+  - Integrate Stripe (international) or TossPayments (Korean users)
+  - Until then: paid templates show "contact to purchase" button
+    linking to Contact page with pre-filled subject line
+
+────────────────────────────────────────────────────────
+  PAGE 5: CONTACT (contact.html)
+────────────────────────────────────────────────────────
+
+Purpose:
+  Allow users to send feedback, bug reports, feature requests,
+  job listing submissions, and partnership inquiries.
+
+Sections:
+  1. Navigation bar
+  2. Page header: "무엇이든 물어보세요" / "Ask us anything"
+  3. Two-column layout:
+     LEFT — Contact form:
+       - Name field
+       - Email field
+       - Inquiry type (dropdown):
+           Feature Request / Bug Report / Job Listing Submission /
+           Partnership / Template Upload Request / Other
+       - Message textarea
+       - Submit button → POST to Supabase "contact_submissions" table
+       - On success: show "Thank you" message (no page refresh)
+       - On error: show error message in red
+     RIGHT — Contact info:
+       - Email: hello@hisponsor.com
+       - Twitter/X: @HiSponsorGlobal
+       - KakaoTalk Open Chat link
+       - Operating hours: Weekdays 10:00–18:00 KST
+       - Note: "For job listings or partnerships, more detail = faster reply"
+  4. Footer
+
+Supabase table used:
+  - contact_submissions (id, name, email, inquiry_type, message, created_at, read)
+
+--------------------------------------------------------------------------------
+  SECTION 6: SHARED COMPONENTS
+--------------------------------------------------------------------------------
+
+────────────────────────────────────────────────────────
+  NAVIGATION BAR
+────────────────────────────────────────────────────────
+
+Structure (left to right):
+  [Logo image]  [Home] [Info] [Jobs] [Template] [Contact]    [KO|EN] [Get Started]
+
+Rules:
+  - Sticky (stays at top while scrolling): position: sticky; top: 0; z-index: 200
+  - Background: white (#ffffff)
+  - Bottom border: 1px solid var(--color-border)
+  - Height: 60px
+  - Active page link gets: background var(--color-peach), color var(--color-coral)
+  - On mobile (max-width: 768px): hide the 5 nav links, show hamburger menu
+  - Logo: use /assets/images/logo-horizontal.png, height 34px
+
+KO / EN Language Toggle:
+  - Position: top-right in the navigation bar
+  - Two buttons side by side: "KO" and "EN"
+  - Active language button: white background, dark text, subtle shadow
+  - Inactive: gray background, gray text
+  - On click: call setLang('ko') or setLang('en')
+  - Language preference saved to localStorage so it persists across pages
+  - Implementation: every translatable text element has TWO data attributes:
+      data-ko="Korean text here"
+      data-en="English text here"
+    The setLang() function reads all [data-ko] elements and sets innerHTML
+    to the value of data-ko or data-en depending on current language.
+
+"Get Started" button:
+  - Background: var(--color-coral)
+  - Color: white
+  - On click: smooth scroll to hero CTA or open Supabase auth modal (Phase 2)
+
+────────────────────────────────────────────────────────
+  FOOTER
+────────────────────────────────────────────────────────
+
+Structure (3-column grid):
+  LEFT column (wider):
+    - Logo image (logo-horizontal.png, with CSS brightness filter to make it white)
+    - Tagline: "Connecting global visa sponsorship jobs in one place."
+  CENTER column:
+    - Heading: "Services"
+    - Links: Job Board / Visa Info / Templates
+  RIGHT column:
+    - Heading: "Contact"
+    - Links: Send Feedback / Partnership
+
+Bottom bar:
+  - "© 2025 HiSponsor" left
+  - "Visa Sponsorship Job Platform" right
+  - Both in small gray text
+
+Styling:
+  - Background: #1E1C1A (near black)
+  - Text: #908880 (warm gray)
+  - Links: same gray, on hover → var(--color-coral)
+  - Logo: filter: brightness(0) invert(1) at 70% opacity (makes it white)
+
+--------------------------------------------------------------------------------
+  SECTION 7: SUPABASE SETUP INSTRUCTIONS
+--------------------------------------------------------------------------------
+
+Step 1: Create a new Supabase project at https://supabase.com
+  - Region: Northeast Asia (Tokyo)
+  - Name: hisponsor
+  - Save your database password somewhere safe
+
+Step 2: Run the following SQL in the Supabase SQL Editor to create all tables.
+  Copy each block and click "Run".
+
+-- ============================================================
+-- TABLE: jobs (채용 공고)
+-- ============================================================
+create table jobs (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,                    -- Job title in English
+  title_ko text,                          -- Job title in Korean (AI translated)
+  company text not null,                  -- Company name
+  company_logo text,                      -- URL to company logo image
+  location text,                          -- City, State/Country
+  country text,                           -- 2-letter country code (US, GB, DE...)
+  category text,                          -- engineering, data, design, pm, devops
+  description text,                       -- Full job description in English
+  description_ko text,                    -- Full job description in Korean
+  requirements text,                      -- Requirements text
+  visa_sponsored boolean default true,    -- Does company sponsor visas?
+  visa_types text[],                      -- e.g. ['H1B', 'O1', 'TN']
+  salary_min integer,                     -- Minimum salary (in local currency)
+  salary_max integer,                     -- Maximum salary
+  salary_currency text default 'USD',     -- Currency code
+  employment_type text default 'full-time', -- full-time, part-time, contract
+  remote_ok boolean default false,        -- Is remote work allowed?
+  apply_url text,                         -- Direct application link
+  source_site text,                       -- Where was this job collected from?
+  slug text unique,                       -- URL-friendly ID (e.g. "stripe-swe-2025")
+  is_featured boolean default false,      -- Show at the top?
+  is_active boolean default true,         -- Is the listing still open?
+  created_at timestamp default now(),
+  updated_at timestamp default now()
+);
+
+-- ============================================================
+-- TABLE: posts (정보 게시물)
+-- ============================================================
+create table posts (
+  id uuid primary key default uuid_generate_v4(),
+  title_ko text not null,                 -- Article title in Korean
+  title_en text not null,                 -- Article title in English
+  body_ko text,                           -- Article body in Korean (Markdown)
+  body_en text,                           -- Article body in English (Markdown)
+  country text,                           -- Target country (US, GB, DE, JP...)
+  visa_type text,                         -- H1B, EU_BLUE_CARD, WORK_VISA...
+  thumbnail_emoji text default '🌍',      -- Emoji shown as card thumbnail
+  author_id uuid,                         -- References auth.users
+  published boolean default false,        -- Only show if published = true
+  created_at timestamp default now(),
+  updated_at timestamp default now()
+);
+
+-- ============================================================
+-- TABLE: comments (댓글)
+-- ============================================================
+create table comments (
+  id uuid primary key default uuid_generate_v4(),
+  post_id uuid references posts(id) on delete cascade,
+  author_name text not null,              -- Commenter's display name
+  author_email text,                      -- Optional email (not shown publicly)
+  body text not null,                     -- Comment content
+  approved boolean default true,          -- Set to false to hide a comment
+  created_at timestamp default now()
+);
+
+-- ============================================================
+-- TABLE: templates (템플릿 마켓)
+-- ============================================================
+create table templates (
+  id uuid primary key default uuid_generate_v4(),
+  name_ko text not null,                  -- Template name in Korean
+  name_en text not null,                  -- Template name in English
+  description_ko text,                    -- Description in Korean
+  description_en text,                    -- Description in English
+  author_id uuid,                         -- References auth.users
+  author_username text,                   -- Display name for author
+  platform text,                          -- notion, google_docs, word, figma, pdf
+  price_usd numeric(6,2) default 0,       -- 0 = free
+  preview_url text,                       -- Link to preview the template
+  download_url text,                      -- Link to download/access the template
+  status text default 'pending',          -- pending, approved, rejected
+  downloads integer default 0,            -- How many times downloaded/purchased
+  created_at timestamp default now(),
+  updated_at timestamp default now()
+);
+
+-- ============================================================
+-- TABLE: contact_submissions (문의 접수)
+-- ============================================================
+create table contact_submissions (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,                     -- Sender's name
+  email text not null,                    -- Sender's email
+  inquiry_type text,                      -- feature, bug, job_listing, partnership, other
+  message text not null,                  -- Message body
+  read boolean default false,             -- Has admin read this?
+  created_at timestamp default now()
+);
+
+-- ============================================================
+-- ROW LEVEL SECURITY (보안 설정)
+-- Everyone can read; only authenticated users can write
+-- ============================================================
+alter table jobs enable row level security;
+alter table posts enable row level security;
+alter table comments enable row level security;
+alter table templates enable row level security;
+alter table contact_submissions enable row level security;
+
+create policy "Public can read active jobs"
+  on jobs for select using (is_active = true);
+
+create policy "Public can read published posts"
+  on posts for select using (published = true);
+
+create policy "Public can read approved comments"
+  on comments for select using (approved = true);
+
+create policy "Public can insert comments"
+  on comments for insert with check (true);
+
+create policy "Public can read approved templates"
+  on templates for select using (status = 'approved');
+
+create policy "Authenticated users can insert templates"
+  on templates for insert with check (auth.role() = 'authenticated');
+
+create policy "Public can insert contact submissions"
+  on contact_submissions for insert with check (true);
+
+create policy "Authenticated admins can insert/update jobs"
+  on jobs for all using (auth.role() = 'authenticated');
+
+Step 3: Get your API keys from Supabase
+  - Go to Settings → API
+  - Copy: "Project URL" and "anon public" key
+  - Put them in /assets/js/supabase.js (see Section 8)
+
+--------------------------------------------------------------------------------
+  SECTION 8: SUPABASE CLIENT CODE (supabase.js)
+--------------------------------------------------------------------------------
+
+The file /assets/js/supabase.js must contain ONLY this:
+
+  // ============================================================
+  // 한국어: Supabase 클라이언트 초기화 파일
+  //         이 파일은 절대 수정하지 마세요 — API 키가 들어있습니다
+  //         키를 GitHub에 올리지 마세요 (공개 저장소인 경우)
+  // English: Supabase client initialization file
+  //          Do NOT modify this file — it contains your API keys
+  //          Do NOT push this file to a public GitHub repo as-is
+  // ============================================================
+
+  // 한국어: Supabase CDN에서 클라이언트 라이브러리를 불러옵니다
+  // English: Import the Supabase client library from CDN
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+  // ============================================================
+  // 한국어: 여기에 당신의 Supabase 프로젝트 정보를 입력하세요
+  //         URL과 KEY는 Supabase 대시보드 → Settings → API 에서 찾을 수 있습니다
+  // English: Enter your Supabase project credentials here
+  //          Find URL and KEY in Supabase Dashboard → Settings → API
+  // ============================================================
+  const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co'
+  const SUPABASE_ANON_KEY = 'YOUR_ANON_PUBLIC_KEY_HERE'
+
+  // 한국어: supabase 변수를 만들고 다른 파일에서 사용할 수 있게 내보냅니다
+  // English: Create the supabase variable and export it for use in other files
+  export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+--------------------------------------------------------------------------------
+  SECTION 9: LANGUAGE TOGGLE CODE (i18n.js)
+--------------------------------------------------------------------------------
+
+The file /assets/js/i18n.js must contain:
+
+  // ============================================================
+  // 한국어: 한국어/영어 언어 전환 시스템
+  //         모든 페이지에서 공유되는 KO/EN 토글 로직입니다
+  //
+  // English: Korean/English language toggle system
+  //          Shared KO/EN toggle logic used on all pages
+  // ============================================================
+
+  // 한국어: 현재 언어를 저장하는 변수. 기본값은 'ko' (한국어)
+  // English: Variable storing current language. Default is 'ko' (Korean)
+  let currentLang = localStorage.getItem('hisponsor_lang') || 'ko'
+
+  // 한국어: 페이지 로드 시 저장된 언어 설정을 적용합니다
+  // English: Apply saved language setting on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    applyLang(currentLang)
+  })
+
+  // ============================================================
+  // 한국어: 언어를 전환하는 주요 함수
+  //         lang 매개변수에 'ko' 또는 'en'을 전달합니다
+  //
+  // English: Main function to switch language
+  //          Pass 'ko' or 'en' as the lang parameter
+  // ============================================================
+  function setLang(lang) {
+    currentLang = lang
+    localStorage.setItem('hisponsor_lang', lang) // 언어 선택 저장 / Save language choice
+    applyLang(lang)
+  }
+
+  // ============================================================
+  // 한국어: 실제 텍스트를 바꾸는 함수
+  //         data-ko 또는 data-en 속성에서 텍스트를 읽어서 적용합니다
+  //
+  // English: Function that actually swaps the text
+  //          Reads text from data-ko or data-en attributes and applies them
+  // ============================================================
+  function applyLang(lang) {
+    // 한국어: data-ko 속성을 가진 모든 요소를 찾습니다
+    // English: Find all elements that have a data-ko attribute
+    document.querySelectorAll('[data-ko]').forEach(el => {
+      const value = el.getAttribute('data-' + lang)
+      if (!value) return // 값이 없으면 건너뜁니다 / Skip if no value
+
+      // 한국어: 요소 타입에 따라 다르게 처리합니다
+      // English: Handle differently based on element type
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.placeholder = value  // 인풋은 placeholder를 바꿉니다 / Inputs change placeholder
+      } else if (el.tagName === 'OPTION') {
+        el.textContent = value  // 옵션은 텍스트를 바꿉니다 / Options change text
+      } else {
+        el.innerHTML = value    // 나머지는 HTML 내용을 바꿉니다 / Others change HTML
+      }
+    })
+
+    // 한국어: KO/EN 버튼 활성화 상태를 업데이트합니다
+    // English: Update the active state of KO/EN buttons
+    const btnKo = document.getElementById('btn-ko')
+    const btnEn = document.getElementById('btn-en')
+    if (btnKo) btnKo.classList.toggle('active', lang === 'ko')
+    if (btnEn) btnEn.classList.toggle('active', lang === 'en')
+
+    // 한국어: HTML lang 속성도 업데이트합니다 (접근성을 위해)
+    // English: Also update HTML lang attribute (for accessibility)
+    document.documentElement.lang = lang
+  }
+
+  // 한국어: 전역에서 사용할 수 있도록 window 객체에 등록합니다
+  // English: Register on window object so it can be used globally
+  window.setLang = setLang
+
+--------------------------------------------------------------------------------
+  SECTION 10: COMMENT RULES FOR ALL CODE
+--------------------------------------------------------------------------------
+
+MANDATORY: Every single JavaScript file, HTML file, and CSS file MUST contain
+bilingual comments (Korean + English) throughout.
+
+Rules for writing comments:
+  1. Every function must have a comment block ABOVE it explaining:
+     - Korean: 이 함수가 무엇을 하는지, 어떤 매개변수를 받는지
+     - English: What this function does, what parameters it takes
+  2. Every complex line of code must have an inline comment
+  3. Every section of HTML must have a comment identifying what it is
+  4. Every CSS rule group must have a comment explaining what it styles
+  5. API calls must explain what endpoint is being called and why
+  6. Supabase queries must explain which table and what data is fetched
+
+Comment format example:
+
+  // ============================================================
+  // 한국어: 채용 공고 목록을 Supabase에서 가져오는 함수
+  //         country: 국가 코드 (예: 'US', 'GB', 'DE') — 없으면 전체 조회
+  //         limit: 한 번에 가져올 공고 수 (기본값: 20)
+  //
+  // English: Function to fetch job listings from Supabase
+  //          country: country code (e.g. 'US', 'GB', 'DE') — null = all
+  //          limit: how many jobs to fetch at once (default: 20)
+  // ============================================================
+  async function fetchJobs(country = null, limit = 20) {
+    // 한국어: Supabase에서 jobs 테이블을 조회합니다
+    // English: Query the jobs table from Supabase
+    let query = supabase
+      .from('jobs')                 // 한국어: jobs 테이블에서 / English: from jobs table
+      .select('*')                  // 한국어: 모든 컬럼 선택 / English: select all columns
+      .eq('is_active', true)        // 한국어: 활성 공고만 / English: only active listings
+      .order('created_at', { ascending: false }) // 한국어: 최신순 정렬 / English: newest first
+      .limit(limit)                 // 한국어: 개수 제한 / English: limit results
+    ...
+  }
+
+--------------------------------------------------------------------------------
+  SECTION 11: CLOUDFLARE PAGES DEPLOYMENT
+--------------------------------------------------------------------------------
+
+The _redirects file must contain:
+  /jobs/*      /jobs.html      200
+  /info/*      /info.html      200
+  /template/*  /template.html  200
+  /contact/*   /contact.html   200
+  /*           /index.html     404
+
+GitHub to Cloudflare Pages setup:
+  1. Go to https://pages.cloudflare.com
+  2. Create application → Pages → Connect to Git → Select hisponsor-web repo
+  3. Framework preset: None
+  4. Build command: (leave empty)
+  5. Build output directory: / (root)
+  6. Environment variables: none needed (API keys are in supabase.js)
+  7. Save and Deploy — the site will auto-deploy on every GitHub push
+
+--------------------------------------------------------------------------------
+  SECTION 12: WHAT TO BUILD IN EACH SESSION
+--------------------------------------------------------------------------------
+
+When a user asks you to build or modify this project, follow this priority order:
+
+  PHASE 1 (Build first — MVP):
+    [ ] index.html — Home page complete
+    [ ] nav component (shared, copy into each page)
+    [ ] footer component (shared, copy into each page)
+    [ ] jobs.html — Jobs page with static mock data
+    [ ] info.html — Info page with static mock data
+    [ ] template.html — Template page with mock cards
+    [ ] contact.html — Contact form (no Supabase yet)
+    [ ] style.css — Global styles and CSS variables
+    [ ] i18n.js — Language toggle working on all pages
+    [ ] Deploy to Cloudflare Pages via GitHub
+
+  PHASE 2 (Connect data):
+    [ ] supabase.js — Initialize Supabase client
+    [ ] jobs.js — Fetch real jobs from Supabase
+    [ ] info.js — Fetch real posts from Supabase
+    [ ] comments — Load and post comments via Supabase
+    [ ] contact.js — Submit form to Supabase contact_submissions
+    [ ] template.js — Fetch approved templates from Supabase
+
+  PHASE 3 (Automation):
+    [ ] n8n job collection workflow
+    [ ] Claude API translation workflow
+    [ ] Email notification system
+
+  PHASE 4 (Monetization):
+    [ ] Supabase Auth (Google login)
+    [ ] Template uploads with user accounts
+    [ ] Stripe / TossPayments integration for paid templates
+
+--------------------------------------------------------------------------------
+  SECTION 13: HOW TO ASK THE AI FOR HELP
+--------------------------------------------------------------------------------
+
+When asking Claude, ChatGPT, or any AI for help with this project,
+always start your message with this context block:
+
+  ---
+  PROJECT: HiSponsor — Global Visa Sponsorship Job Platform
+  TECH STACK: Plain HTML + CSS + Vanilla JS + Supabase + Cloudflare Pages
+  RULES: Must follow RULE.md (simplicity first, surgical changes, no frameworks)
+  BILINGUAL: All code comments must be in BOTH Korean and English
+  MY LEVEL: I am not a programmer — explain everything step by step
+  ---
+
+  Then describe what you want:
+  "I want to add a search bar to the Jobs page that filters listings by job title."
+
+  If there is an error, paste the exact error message:
+  "I got this error: [paste error here]. What does it mean and how do I fix it?"
+
+--------------------------------------------------------------------------------
+  SECTION 14: CUSTOMIZATION GUIDE (FOR NON-DEVELOPERS)
+--------------------------------------------------------------------------------
+
+To change colors:
+  Open /assets/css/style.css
+  Find the :root { ... } section at the top
+  Change the hex color values (#F07B5A, etc.)
+  Save the file and push to GitHub — Cloudflare auto-deploys in 1 minute
+
+To change text content:
+  Open the relevant .html file (e.g. index.html for the home page)
+  Find the element with the text you want to change
+  Change the text in BOTH data-ko="..." and data-en="..."
+  Save and push to GitHub
+
+To add a new job listing manually:
+  Go to https://supabase.com → your project → Table Editor → jobs table
+  Click "+ Insert row"
+  Fill in: title, company, location, country, category, visa_sponsored, apply_url
+  Set is_active = true
+  Click Save
+
+To add a new info article:
+  Go to Supabase → Table Editor → posts table
+  Click "+ Insert row"
+  Fill in: title_ko, title_en, body_ko, body_en, country, visa_type, thumbnail_emoji
+  Set published = true
+  Click Save
+
+To approve a template submission:
+  Go to Supabase → Table Editor → templates table
+  Find the row with status = 'pending'
+  Change status to 'approved'
+  Click Save — it will appear on the site immediately
+
+To read contact messages:
+  Go to Supabase → Table Editor → contact_submissions table
+  New messages will appear here
+  After reading, change 'read' column to true
+
+================================================================================
+  END OF PROMPT
+  Build great things. Keep it simple. Follow RULE.md.
+================================================================================

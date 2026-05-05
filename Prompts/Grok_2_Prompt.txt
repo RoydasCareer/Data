@@ -1,0 +1,98 @@
+You are an expert full-stack developer. Build a clean, maintainable, and professional website called "HiSponsor" following the exact requirements below.
+
+### STRICT RULES - YOU MUST FOLLOW
+- You MUST strictly follow the guidelines in RULE.md (Behavioral guidelines to reduce common LLM coding mistakes). 
+  - Prioritize simplicity first. Minimum code that solves the problem.
+  - No unnecessary abstractions, features, or flexibility.
+  - Make surgical changes only.
+  - Keep everything as simple as possible so that a complete beginner (non-programmer) can maintain and customize it.
+- Use Astro framework (latest version).
+- Support bilingual (Korean + English) with clean URL structure: /ko and /en.
+- All code must have very detailed comments in BOTH Korean and English.
+- Generate two complete README files: README.md (Korean) and README-EN.md (English). They must be extremely detailed so that even someone who has never coded before can understand how to maintain, update content, add new jobs, change design, etc.
+
+### PROJECT STRUCTURE (Create exactly this structure)
+
+HiSponsor/
+├── src/
+│   ├── pages/
+│   │   ├── index.astro
+│   │   ├── ko/
+│   │   │   ├── index.astro
+│   │   │   ├── info/
+│   │   │   │   └── [slug].astro
+│   │   │   ├── jobs/
+│   │   │   │   ├── index.astro
+│   │   │   │   └── [id].astro
+│   │   │   ├── templates/
+│   │   │   │   ├── index.astro
+│   │   │   │   └── [slug].astro
+│   │   │   └── contact.astro
+│   │   └── en/                  (same structure as ko/)
+│   ├── components/
+│   │   ├── Header.astro
+│   │   ├── LanguageSwitcher.astro
+│   │   ├── JobCard.astro
+│   │   ├── Footer.astro
+│   │   └── ...
+│   ├── layouts/
+│   │   └── MainLayout.astro
+│   └── content/
+│       ├── info/                (Markdown files)
+│       └── config.ts
+├── public/
+├── data/                        (for jobs JSON)
+├── astro.config.mjs
+├── package.json
+├── README.md                    (Detailed Korean version)
+└── README-EN.md                 (Detailed English version)
+
+
+### PAGE REQUIREMENTS
+
+**Home Page (/ and /ko, /en)**
+- Clean hero section explaining why this site was made.
+- Brief description of main features (Info, Jobs, Templates, Contact).
+- Recent Jobs preview (3-4 cards).
+- Call-to-action to give feedback / contact.
+
+**Info Section**
+- Markdown-based blog style.
+- Use Astro Content Collections.
+- Add Giscus comment system (GitHub-based, free).
+
+**Jobs Section**
+- Fetch job data from JSON file (data/jobs.json) or public Google Sheets JSON feed.
+- Show list with filters (simple).
+- Detail page for each job.
+- Display fields: title, company, location, url, detected_at, visa info, etc.
+
+**Templates Section**
+- Simple template marketplace style.
+- List of resume/CV/cover letter templates with preview images.
+- Link to download or external purchase (Gumroad style).
+
+**Contact Page**
+- Simple contact form (use Formspree or EmailJS) + direct links.
+
+**Language Switching**
+- Top right corner: KO | EN buttons.
+- Use Astro i18n routing.
+
+### ADDITIONAL REQUIREMENTS
+- Use Tailwind CSS for styling (clean, modern, minimal design).
+- Mobile responsive.
+- All components and pages must have very detailed bilingual comments (Korean + English) explaining every important part.
+- Keep the code extremely simple and readable.
+- Provide clear instructions in README on:
+  - How to add new Info articles (Markdown)
+  - How to update Jobs data
+  - How to add new Templates
+  - How to change text, colors, add pages
+  - How to deploy to GitHub Pages
+  - How to run locally
+
+First, create the complete project with the exact folder structure above.
+Then generate the two README files with extremely detailed, beginner-friendly instructions in Korean (README.md) and English (README-EN.md).
+
+Start by initializing a new Astro project and building according to the structure. Output all files clearly with proper file paths.
