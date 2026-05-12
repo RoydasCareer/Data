@@ -1,0 +1,88 @@
+# .github/workflows/collect.yml
+# ═══════════════════════════════════════════════════
+# Visa Job 자동 수집 워크플로우
+# ═══════════════════════════════════════════════════
+#
+# 실행 트리거:
+#   1. 자동: 매일 UTC 00:00, 06:00, 12:00, 18:00 (KST +9)
+#   2. 수동: GitHub → Actions 탭 → "Run workflow"
+#
+# 필요한 GitHub Secrets (Settings → Secrets → Actions):
+#   - DATABASE_URL: PostgreSQL 연결 문자열
+#
+# 특정 수집기만 실행하려면:
+#   수동 실행 시 sites 입력에 "arbeitnow remotive" 처럼 입력
+# ═══════════════════════════════════════════════════
+
+name: Visa Job Collector
+
+on:
+  schedule:
+    # UTC 기준 (KST = UTC+9)
+    # 한국 시간 기준: 09:00, 15:00, 21:00, 03:00
+    - cron: "0 0,6,12,18 * * *"
+
+  workflow_dispatch:  # 수동 실행 지원
+    inputs:
+      sites:
+        description: "실행할 수집기 (공백 구분, 비워두면 전체)"
+        required: false
+        default: ""
+      dry_run:
+        description: "DB 저장 없이 테스트만 실행"
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  collect:
+    name: 채용 공고 수집
+    runs-on: ubuntu-latest
+    timeout-minutes: 30    # 최대 30분 (초과 시 자동 종료)
+
+    steps:
+      # ── 코드 체크아웃 ──
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      # ── Python 환경 설정 ──
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 의존성 설치 ──
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      # ── DB 마이그레이션 (첫 실행 또는 스키마 변경 시 적용) ──
+      - name: DB 마이그레이션
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python main.py --migrate-only
+
+      # ── 수집 실행 ──
+      - name: 공고 수집 실행
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # 수동 실행 시 sites/dry_run 인수 처리
+          ARGS=""
+          if [ -n "${{ github.event.inputs.sites }}" ]; then
+            ARGS="--sites ${{ github.event.inputs.sites }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          python main.py $ARGS
+
+      # ── 실패 시 알림 (선택 사항) ──
+      # Slack, Discord, Email 등 연동하려면 아래 주석 해제 후 설정
+      # - name: 실패 알림
+      #   if: failure()
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: ${{ job.status }}
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK }}
