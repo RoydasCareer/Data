@@ -1,7 +1,0 @@
-# ── 핵심 의존성 ──────────────────────────────
-httpx==0.27.0            # HTTP 클라이언트
-feedparser==6.0.11       # RSS/Atom 피드 파서
-psycopg2-binary==2.9.9   # PostgreSQL 드라이버
-pydantic==2.7.1          # 데이터 유효성 검사 및 스키마
-python-dotenv==1.0.1     # .env 파일 로드
-python-dateutil==2.9.0   # 날짜 파싱 (다양한 형식 지원)

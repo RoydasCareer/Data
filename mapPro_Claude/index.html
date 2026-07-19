@@ -1,0 +1,1846 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GlobeTravel Log — 지구본 여행 기록</title>
+
+<!--
+  기술 스택: CesiumJS + OpenStreetMap 타일
+  선택 이유: 완전 무료·오픈소스, API 키 불필요, 3D 지구본 렌더링 최고 품질,
+             대원 곡선/엔티티 애니메이션 공식 지원, iframe 임베딩 완벽 호환
+-->
+
+<!-- Ion 요청 사전 차단 — CesiumJS 로드 전에 실행돼야 함 -->
+<script>
+(function() {
+  var _fetch = window.fetch;
+  window.fetch = function(input, init) {
+    var url = (input && typeof input === 'object' && input.url) ? input.url : String(input || '');
+    if (url.indexOf('api.cesium.com') !== -1 || url.indexOf('assets.cesium.com') !== -1) {
+      console.warn('[Ion 차단]', url);
+      return Promise.resolve(new Response('{}', {status: 200, headers: {'Content-Type': 'application/json'}}));
+    }
+    return _fetch.apply(window, arguments);
+  };
+  var _open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url) {
+    if (url && (String(url).indexOf('api.cesium.com') !== -1 || String(url).indexOf('assets.cesium.com') !== -1)) {
+      console.warn('[Ion XHR 차단]', url);
+      arguments[1] = 'data:application/json,{}';
+    }
+    return _open.apply(this, arguments);
+  };
+})();
+</script>
+
+<!-- CesiumJS -->
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.107/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.107/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+<!-- exifr — EXIF GPS 추출 -->
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+
+<!-- Google Fonts — Noto Sans KR -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* ── 리셋 & CSS 변수 ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-deep:    #0a0a1a;
+  --bg-panel:   rgba(10,10,28,0.93);
+  --bg-card:    rgba(18,18,42,0.97);
+  --bg-hover:   rgba(28,28,58,0.9);
+  --border:     rgba(90,110,200,0.22);
+  --accent:     #4fc3f7;
+  --accent-dim: rgba(79,195,247,0.18);
+  --txt:        #e8eaf6;
+  --txt2:       #9fa8da;
+  --txt3:       #5c6bc0;
+  --danger:     #ef5350;
+  --success:    #66bb6a;
+  --radius:     12px;
+  --sw:         320px;   /* sidebar width */
+  --tr:         0.22s ease;
+}
+
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg-deep);
+  color: var(--txt);
+  overflow: hidden;
+  width: 100vw; height: 100vh;
+}
+
+/* ── 별 캔버스 (배경) ── */
+#starfield {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+}
+
+/* ── Cesium 컨테이너 ── */
+#cesiumContainer {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  z-index: 1;
+}
+
+/* Cesium 기본 UI 완전 제거 */
+.cesium-widget-credits,
+.cesium-viewer-bottom,
+.cesium-viewer-toolbar,
+.cesium-viewer-animationContainer,
+.cesium-viewer-timelineContainer,
+.cesium-viewer-fullscreenContainer { display: none !important; }
+
+/* ── 사이드바 ── */
+#sidebar {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  width: var(--sw);
+  background: var(--bg-panel);
+  backdrop-filter: blur(24px);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 100;
+  transition: transform var(--tr);
+}
+#sidebar.collapsed { transform: translateX(calc(var(--sw) - 44px)); }
+
+/* ── 사이드바 헤더 ── */
+.sb-header {
+  padding: 18px 14px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.sb-logo { font-size: 24px; }
+.sb-title { flex: 1; }
+.sb-title h1 { font-size: 15px; font-weight: 700; color: var(--accent); line-height: 1.3; }
+.sb-title small { font-size: 11px; color: var(--txt3); }
+.sb-toggle {
+  background: none; border: none;
+  color: var(--txt2); cursor: pointer;
+  font-size: 17px; padding: 4px 6px; border-radius: 6px;
+  transition: color var(--tr);
+}
+.sb-toggle:hover { color: var(--accent); }
+
+/* ── 탭 ── */
+.tabs { display: flex; border-bottom: 1px solid var(--border); }
+.tab-btn {
+  flex: 1; padding: 9px 4px;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--txt3); font-size: 11px; font-family: inherit;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: color var(--tr);
+}
+.tab-btn .ico { font-size: 17px; }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── 탭 콘텐츠 ── */
+.tab-body { display: none; flex: 1; overflow-y: auto; padding: 10px; }
+.tab-body.active { display: flex; flex-direction: column; gap: 8px; }
+
+/* 스크롤바 */
+.tab-body::-webkit-scrollbar { width: 4px; }
+.tab-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── 버튼 ── */
+.btn {
+  padding: 8px 14px; border-radius: 8px; border: none;
+  font-family: inherit; font-size: 13px; cursor: pointer;
+  transition: all var(--tr);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--accent); color: #071014; font-weight: 600; }
+.btn-primary:hover { background: #81d4fa; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--txt2);
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.btn-danger { background: transparent; border: 1px solid rgba(239,83,80,.35); color: var(--danger); }
+.btn-danger:hover { background: rgba(239,83,80,.12); }
+.btn-full { width: 100%; justify-content: center; }
+
+/* ── 장소 아이템 ── */
+.loc-item {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 9px 11px;
+  cursor: pointer; transition: all var(--tr);
+  display: flex; align-items: center; gap: 8px;
+}
+.loc-item:hover { border-color: var(--accent); background: var(--bg-hover); }
+.loc-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 7px var(--accent); flex-shrink: 0;
+}
+.loc-info { flex: 1; min-width: 0; }
+.loc-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.loc-date { font-size: 11px; color: var(--txt3); margin-top: 2px; }
+.loc-actions { display: flex; gap: 2px; opacity: 0; transition: opacity var(--tr); }
+.loc-item:hover .loc-actions { opacity: 1; }
+.ico-btn {
+  background: none; border: none; color: var(--txt3);
+  cursor: pointer; padding: 4px 5px; border-radius: 5px;
+  font-size: 13px; transition: color var(--tr);
+}
+.ico-btn:hover { color: var(--danger); }
+
+/* ── 경로 아이템 ── */
+.route-item {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 9px 11px;
+  display: flex; align-items: center; gap: 8px;
+}
+.route-ico { font-size: 18px; }
+.route-info { flex: 1; min-width: 0; }
+.route-name { font-size: 12px; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.route-detail { font-size: 11px; color: var(--txt3); }
+
+/* ── 통계 ── */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; text-align: center;
+}
+.stat-val { font-size: 26px; font-weight: 700; color: var(--accent); }
+.stat-lbl { font-size: 11px; color: var(--txt3); margin-top: 3px; }
+
+/* ── 모달 ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,12,.82); backdrop-filter: blur(10px);
+  z-index: 500; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 22px;
+  width: 480px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 60px); overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,60,.5);
+}
+.modal-title {
+  font-size: 17px; font-weight: 700; color: var(--accent);
+  margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
+}
+
+/* ── 폼 ── */
+.fg { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.fl { font-size: 12px; font-weight: 500; color: var(--txt2); }
+.fi, .ft, .fs {
+  background: rgba(18,18,50,.9); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 11px;
+  color: var(--txt); font-family: inherit; font-size: 13px; width: 100%;
+  transition: border-color var(--tr);
+}
+.fi:focus, .ft:focus, .fs:focus { outline: none; border-color: var(--accent); }
+.ft { resize: vertical; min-height: 70px; }
+.frow { display: flex; gap: 10px; }
+.frow .fg { flex: 1; }
+
+/* ── 교통수단 그리드 ── */
+.tp-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
+.tp-btn {
+  background: var(--bg-hover); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 4px; cursor: pointer;
+  text-align: center; transition: all var(--tr);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.tp-btn .em { font-size: 20px; }
+.tp-btn .lbl { font-size: 10px; color: var(--txt3); }
+.tp-btn.sel { border-color: var(--accent); background: var(--accent-dim); }
+.tp-btn.sel .lbl { color: var(--accent); }
+
+/* ── 모달 액션 ── */
+.m-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+/* ── 사진 패널 ── */
+#photoPanel {
+  position: absolute; bottom: 0; left: 0; right: var(--sw);
+  height: 0; overflow: hidden;
+  background: var(--bg-panel); backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  z-index: 90; display: flex; flex-direction: column;
+  transition: height .3s ease;
+}
+#photoPanel.open { height: 300px; }
+.pp-header {
+  padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.pp-title { flex: 1; font-size: 13px; font-weight: 600; }
+.photo-grid {
+  flex: 1; display: flex; gap: 8px; padding: 10px;
+  overflow-x: auto; align-items: flex-start;
+}
+.photo-grid::-webkit-scrollbar { height: 4px; }
+.photo-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.photo-thumb {
+  width: 120px; height: 120px; flex-shrink: 0;
+  border-radius: 8px; object-fit: cover; cursor: pointer;
+  border: 2px solid transparent; transition: border-color var(--tr);
+}
+.photo-thumb:hover { border-color: var(--accent); }
+.photo-add {
+  width: 120px; height: 120px; flex-shrink: 0;
+  border-radius: 8px; border: 2px dashed var(--border);
+  background: var(--bg-card); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 5px;
+  color: var(--txt3); font-size: 12px;
+  transition: all var(--tr);
+}
+.photo-add:hover { border-color: var(--accent); color: var(--accent); }
+.photo-add span { font-size: 26px; }
+
+/* ── 라이트박스 ── */
+#lightbox {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.96); z-index: 2000;
+  flex-direction: column; align-items: center; justify-content: center;
+}
+#lightbox.open { display: flex; }
+.lb-img {
+  max-width: calc(100vw - 110px); max-height: calc(100vh - 130px);
+  object-fit: contain; border-radius: 8px;
+}
+.lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,.1); border: none; color: #fff;
+  font-size: 22px; padding: 14px 18px; cursor: pointer;
+  border-radius: 8px; transition: background var(--tr);
+}
+.lb-nav:hover { background: rgba(255,255,255,.2); }
+.lb-prev { left: 14px; } .lb-next { right: 14px; }
+.lb-info {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 14px 22px; text-align: center;
+  background: linear-gradient(transparent,rgba(0,0,0,.85));
+}
+.lb-close {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(255,255,255,.12); border: none; color: #fff;
+  font-size: 18px; padding: 7px 12px; cursor: pointer; border-radius: 8px;
+}
+
+/* ── 툴팁 ── */
+#tooltip {
+  position: absolute; background: var(--bg-card);
+  border: 1px solid var(--border); padding: 5px 11px;
+  border-radius: 8px; font-size: 12px;
+  pointer-events: none; z-index: 200; white-space: nowrap; display: none;
+}
+
+/* ── 컨텍스트 메뉴 ── */
+#ctxMenu {
+  position: absolute; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: 9px;
+  padding: 5px; z-index: 300; display: none; min-width: 110px;
+}
+.ctx-item {
+  padding: 7px 11px; cursor: pointer; border-radius: 6px;
+  font-size: 13px; display: flex; align-items: center; gap: 7px;
+  transition: background var(--tr);
+}
+.ctx-item:hover { background: var(--bg-hover); }
+.ctx-item.danger { color: var(--danger); }
+
+/* ── 좌표 선택 안내 ── */
+#pickNotice {
+  display: none; position: absolute; top: 18px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card); border: 1px solid var(--accent);
+  border-radius: 10px; padding: 9px 18px;
+  font-size: 13px; color: var(--accent); z-index: 200;
+  white-space: nowrap;
+}
+
+/* ── 자동완성 ── */
+.ac-wrap { position: relative; }
+.ac-list {
+  position: absolute; top: 100%; left: 0; right: 0;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; max-height: 180px; overflow-y: auto; z-index: 600;
+  display: none;
+}
+.ac-item {
+  padding: 7px 11px; cursor: pointer; font-size: 12px;
+  transition: background var(--tr);
+}
+.ac-item:hover { background: var(--bg-hover); }
+
+/* ── 구분선·배지·빈상태 ── */
+.divider { height: 1px; background: var(--border); margin: 6px 0; }
+.badge {
+  background: var(--accent-dim); color: var(--accent);
+  border-radius: 99px; padding: 2px 7px; font-size: 11px; font-weight: 600;
+}
+.empty {
+  text-align: center; padding: 36px 16px; color: var(--txt3);
+}
+.empty .ei { font-size: 38px; margin-bottom: 10px; }
+.empty p { font-size: 13px; line-height: 1.7; }
+
+/* ── 토스트 ── */
+#toastWrap {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 3000; pointer-events: none;
+}
+.toast {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 18px; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+  animation: tIn .25s ease;
+}
+.toast.success { border-color: var(--success); }
+.toast.error   { border-color: var(--danger); }
+.toast.info    { border-color: var(--accent); }
+@keyframes tIn { from { opacity: 0; transform: translateY(16px); } }
+
+/* ── 진행바 ── */
+.prog-bar {
+  height: 3px; background: var(--border); border-radius: 2px; overflow: hidden;
+}
+.prog-fill {
+  height: 100%; background: var(--accent); border-radius: 2px;
+  transition: width .25s ease;
+}
+
+/* ── 반응형 ── */
+@media (max-width: 768px) {
+  :root { --sw: 270px; }
+  #photoPanel { right: 0; }
+}
+@media (max-width: 520px) {
+  #sidebar {
+    width: 100%; height: 45vh;
+    top: auto; right: 0; bottom: 0;
+    border-left: none; border-top: 1px solid var(--border);
+    transform: none;
+  }
+  #sidebar.collapsed { transform: translateY(calc(45vh - 48px)); }
+  #photoPanel { right: 0; }
+}
+
+/* 설정 토글 스위치 */
+.setting-section { padding: 4px 0; }
+.setting-section h4 { font-size: 11px; color: #546e7a; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 10px; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px; }
+.setting-lbl { font-size: 13px; color: #b0bec5; }
+.toggle-sw { position: relative; display: inline-block; width: 42px; height: 23px; flex-shrink: 0; }
+.toggle-sw input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track { position: absolute; inset: 0; background: #1e2d3d; border: 1px solid #2e4a5e; border-radius: 23px; cursor: pointer; transition: background .25s, border-color .25s; }
+.toggle-track::before { content: ''; position: absolute; width: 17px; height: 17px; left: 2px; top: 2px; background: #546e7a; border-radius: 50%; transition: transform .25s, background .25s; }
+.toggle-sw input:checked ~ .toggle-track { background: rgba(79,195,247,.18); border-color: #4fc3f7; }
+.toggle-sw input:checked ~ .toggle-track::before { transform: translateX(19px); background: #4fc3f7; }
+</style>
+</head>
+<body>
+
+<!-- 별 배경 -->
+<canvas id="starfield"></canvas>
+
+<!-- Cesium 지구본 -->
+<div id="cesiumContainer"></div>
+
+<!-- 툴팁 -->
+<div id="tooltip"></div>
+
+<!-- 좌표 선택 안내 -->
+<div id="pickNotice">🌍 지구본 위를 클릭하여 위치를 선택하세요 (ESC: 취소)</div>
+
+<!-- 컨텍스트 메뉴 -->
+<div id="ctxMenu">
+  <div class="ctx-item" id="ctxEdit">✏️ 편집</div>
+  <div class="ctx-item danger" id="ctxDelete">🗑️ 삭제</div>
+</div>
+
+<!-- ━━━ 사이드바 ━━━ -->
+<div id="sidebar">
+  <div class="sb-header">
+    <button class="sb-toggle" id="sbToggle">◀</button>
+    <span class="sb-logo">🌍</span>
+    <div class="sb-title">
+      <h1>GlobeTravel Log</h1>
+      <small>나의 여행 기록</small>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="locations">
+      <span class="ico">📍</span><span>장소</span>
+    </button>
+    <button class="tab-btn" data-tab="routes">
+      <span class="ico">✈️</span><span>경로</span>
+    </button>
+    <button class="tab-btn" data-tab="stats">
+      <span class="ico">📊</span><span>통계</span>
+    </button>
+  </div>
+
+  <!-- 장소 탭 -->
+  <div class="tab-body active" id="tab-locations">
+    <button class="btn btn-primary btn-full" id="addLocBtn">➕ 지역 추가</button>
+    <button class="btn btn-outline btn-full" id="addPhotoLocBtn">📷 사진으로 위치 추가</button>
+    <div class="divider"></div>
+    <div id="locList">
+      <div class="empty"><div class="ei">🗺️</div>
+        <p>아직 방문한 지역이 없습니다.<br>지역을 추가하여 여행을 기록하세요!</p></div>
+    </div>
+  </div>
+
+  <!-- 경로 탭 -->
+  <div class="tab-body" id="tab-routes">
+    <button class="btn btn-primary btn-full" id="addRouteBtn">➕ 경로 추가</button>
+    <div class="divider"></div>
+    <div id="routeList">
+      <div class="empty"><div class="ei">🗺️</div>
+        <p>아직 등록된 경로가 없습니다.</p></div>
+    </div>
+  </div>
+
+  <!-- 통계 탭 -->
+  <div class="tab-body" id="tab-stats">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="sCities">0</div>
+        <div class="stat-lbl">방문 장소</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="sPhotos">0</div>
+        <div class="stat-lbl">저장 사진</div>
+      </div>
+      <div class="stat-card" style="grid-column:span 2;">
+        <div class="stat-val" id="sDist">0 km</div>
+        <div class="stat-lbl">총 이동 거리</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div id="tpStats"></div>
+    <div class="divider"></div>
+    <div id="yearLine"></div>
+    <div class="divider"></div>
+    <div class="setting-section">
+      <h4>⚙ 설정</h4>
+      <div class="setting-row">
+        <span class="setting-lbl">지역 추가 알림 메시지</span>
+        <label class="toggle-sw">
+          <input type="checkbox" id="toastToggle" onchange="setSetting('showLocToast',this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━ 사진 패널 ━━━ -->
+<div id="photoPanel">
+  <div class="pp-header">
+    <span id="ppTitle" class="pp-title">📷 사진</span>
+    <button class="btn btn-outline" id="bulkBtn" style="font-size:12px;">📁 일괄 업로드</button>
+    <button class="ico-btn" id="ppClose" style="font-size:17px;">✕</button>
+  </div>
+  <div class="photo-grid" id="photoGrid" ondragover="event.preventDefault()" ondrop="onDrop(event)"></div>
+</div>
+
+<!-- ━━━ 라이트박스 ━━━ -->
+<div id="lightbox">
+  <button class="lb-close" id="lbClose">✕</button>
+  <button class="lb-nav lb-prev" id="lbPrev">◀</button>
+  <img src="" alt="" class="lb-img" id="lbImg">
+  <button class="lb-nav lb-next" id="lbNext">▶</button>
+  <div class="lb-info">
+    <div id="lbCaption" style="font-size:13px;margin-bottom:8px;"></div>
+    <button class="btn btn-danger" id="lbDelete">🗑️ 삭제</button>
+  </div>
+</div>
+
+<!-- ━━━ 지역 모달 ━━━ -->
+<div class="modal-overlay" id="locModal">
+  <div class="modal">
+    <div class="modal-title">📍 <span id="locModalTitle">지역 추가</span></div>
+    <div class="fg ac-wrap">
+      <label class="fl">지역명 / 검색 *</label>
+      <input type="text" class="fi" id="mName" placeholder="장소 이름으로 검색 (예: 발라톤퓨레드)" autocomplete="off">
+      <div class="ac-list" id="mNameAC"></div>
+    </div>
+    <div class="frow">
+      <div class="fg">
+        <label class="fl">위도 *</label>
+        <input type="number" class="fi" id="mLat" placeholder="13.7563" step="any">
+      </div>
+      <div class="fg">
+        <label class="fl">경도 *</label>
+        <input type="number" class="fi" id="mLng" placeholder="100.5018" step="any">
+      </div>
+    </div>
+    <div class="fg">
+      <button class="btn btn-outline btn-full" id="pickBtn">🌍 지도에서 위치 선택</button>
+    </div>
+    <div class="fg">
+      <label class="fl">방문일자</label>
+      <input type="date" class="fi" id="mDate">
+    </div>
+    <div class="fg">
+      <label class="fl">메모</label>
+      <textarea class="ft" id="mMemo" placeholder="여행 메모를 입력하세요..."></textarea>
+    </div>
+    <div class="m-actions">
+      <button class="btn btn-outline" id="locCancel">취소</button>
+      <button class="btn btn-primary" id="locSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━ 경로 모달 ━━━ -->
+<div class="modal-overlay" id="routeModal">
+  <div class="modal">
+    <div class="modal-title">🛫 <span id="routeModalTitle">경로 추가</span></div>
+    <div class="fg ac-wrap">
+      <label class="fl">출발지 *</label>
+      <input type="text" class="fi" id="rFrom" placeholder="도시명 검색..." autocomplete="off">
+      <div class="ac-list" id="fromAC"></div>
+    </div>
+    <div class="fg ac-wrap">
+      <label class="fl">도착지 *</label>
+      <input type="text" class="fi" id="rTo" placeholder="도시명 검색..." autocomplete="off">
+      <div class="ac-list" id="toAC"></div>
+    </div>
+    <input type="hidden" id="rFromLat"> <input type="hidden" id="rFromLng">
+    <input type="hidden" id="rToLat">   <input type="hidden" id="rToLng">
+    <div class="fg">
+      <label class="fl">교통수단 *</label>
+      <div class="tp-grid">
+        <div class="tp-btn sel" data-t="airplane"><span class="em">✈️</span><span class="lbl">비행기</span></div>
+        <div class="tp-btn" data-t="car"><span class="em">🚗</span><span class="lbl">자동차</span></div>
+        <div class="tp-btn" data-t="train"><span class="em">🚆</span><span class="lbl">기차</span></div>
+        <div class="tp-btn" data-t="bus"><span class="em">🚌</span><span class="lbl">버스</span></div>
+        <div class="tp-btn" data-t="bicycle"><span class="em">🚴</span><span class="lbl">자전거</span></div>
+        <div class="tp-btn" data-t="walk"><span class="em">🚶</span><span class="lbl">도보</span></div>
+        <div class="tp-btn" data-t="ship"><span class="em">🚢</span><span class="lbl">배/크루즈</span></div>
+      </div>
+    </div>
+    <div id="tpDetail" style="display:none;">
+      <div class="frow">
+        <div class="fg">
+          <label class="fl" id="tdL1">항공사</label>
+          <input type="text" class="fi" id="td1" placeholder="예: Korean Air">
+        </div>
+        <div class="fg" id="tdG2">
+          <label class="fl" id="tdL2">편명</label>
+          <input type="text" class="fi" id="td2" placeholder="예: KE651">
+        </div>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">이동일자</label>
+      <input type="date" class="fi" id="rDate">
+    </div>
+    <div class="m-actions">
+      <button class="btn btn-outline" id="routeCancel">취소</button>
+      <button class="btn btn-primary" id="routeSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 숨김 파일 입력 -->
+<input type="file" id="photoInput"  accept="image/*" multiple  style="display:none;">
+<input type="file" id="exifInput"   accept="image/*"           style="display:none;">
+<input type="file" id="bulkInput"   accept="image/*" multiple  style="display:none;">
+
+<!-- 토스트 -->
+<div id="toastWrap"></div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<script>
+"use strict";
+
+/* ──────────────────────────────────────────
+   유틸리티
+────────────────────────────────────────── */
+function uid() {
+  return crypto.randomUUID
+    ? crypto.randomUUID()
+    : 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+}
+
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(() => el.remove(), 3800);
+}
+
+/* Haversine 거리 (km) */
+function dist(lat1, lng1, lat2, lng2) {
+  const R = 6371, d2r = Math.PI / 180;
+  const dLat = (lat2 - lat1) * d2r, dLng = (lng2 - lng1) * d2r;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*d2r)*Math.cos(lat2*d2r)*Math.sin(dLng/2)**2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* 역지오코딩 */
+async function revGeo(lat, lng) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ko`);
+    const d = await r.json();
+    const parts = d.display_name?.split(',') || [];
+    return parts.slice(0, 3).join(', ').trim() || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  } catch { return `${lat.toFixed(4)}, ${lng.toFixed(4)}`; }
+}
+
+/* Nominatim 검색 */
+async function geoSearch(q) {
+  if (!q || q.trim().length < 2) return [];
+  const enc = encodeURIComponent(q.trim());
+  const [pRes, nRes] = await Promise.allSettled([
+    fetch(`https://photon.komoot.io/api/?q=${enc}&lang=ko&limit=7`)
+      .then(r => r.json())
+      .then(d => (d.features || []).map(f => {
+        const p = f.properties;
+        const parts = [p.name, p.district || p.locality, p.city, p.state, p.country].filter(Boolean);
+        return { display_name: [...new Set(parts)].join(', '), lat: String(f.geometry.coordinates[1]), lon: String(f.geometry.coordinates[0]) };
+      })),
+    fetch(`https://nominatim.openstreetmap.org/search?q=${enc}&format=json&limit=5&accept-language=ko,en&namedetails=1`)
+      .then(r => r.json())
+  ]);
+  const all = [];
+  if (pRes.status === 'fulfilled') all.push(...pRes.value);
+  if (nRes.status === 'fulfilled') all.push(...nRes.value);
+  const seen = new Set();
+  return all.filter(r => {
+    const k = (+r.lat).toFixed(1) + ',' + (+r.lon).toFixed(1);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).slice(0, 7);
+}
+
+/* 파일 → Base64 */
+function toBase64(file) {
+  return new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(file); });
+}
+
+/* ──────────────────────────────────────────
+   데이터 스토어
+────────────────────────────────────────── */
+const STORE_KEY = 'globetravel_v1';
+
+function loadData() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+    return {
+      locations: d.locations || [],
+      photos   : d.photos    || [],
+      routes   : d.routes    || [],
+      settings : Object.assign({ showLocToast: true }, d.settings || {})
+    };
+  } catch { return { locations:[], photos:[], routes:[], settings:{ showLocToast:true } }; }
+}
+
+function setSetting(key, val) {
+  app.settings[key] = val;
+  saveData();
+}
+
+function saveData() {
+  try {
+    const json = JSON.stringify(app);
+    if (json.length * 2 > 4.5 * 1024 * 1024)
+      toast('⚠️ 저장 공간이 거의 가득 찼습니다 (5MB 한계)', 'error');
+    localStorage.setItem(STORE_KEY, json);
+  } catch (e) {
+    if (e.name === 'QuotaExceededError')
+      toast('저장 공간 초과! 사진을 줄여주세요.', 'error');
+  }
+}
+
+const app = loadData();
+
+/* ──────────────────────────────────────────
+   별 배경
+────────────────────────────────────────── */
+function initStars() {
+  const cvs = document.getElementById('starfield');
+  const ctx = cvs.getContext('2d');
+
+  function draw() {
+    cvs.width = innerWidth; cvs.height = innerHeight;
+    ctx.fillStyle = '#020210';
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+    for (let i = 0; i < 500; i++) {
+      const x = ((Math.sin(i * 127.1) * 0.5 + 0.5)) * cvs.width;
+      const y = ((Math.sin(i * 311.7) * 0.5 + 0.5)) * cvs.height;
+      const s = Math.abs(Math.sin(i * 173.3)) * 1.2 + 0.3;
+      const a = Math.abs(Math.sin(i * 89.7)) * 0.5 + 0.3;
+      ctx.beginPath();
+      ctx.arc(x, y, s, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,220,255,${a})`;
+      ctx.fill();
+    }
+  }
+  draw();
+  window.addEventListener('resize', draw);
+}
+
+/* ──────────────────────────────────────────
+   CesiumJS 초기화
+────────────────────────────────────────── */
+let viewer;
+let cesiumMarkers = {};   // locationId → entity
+let cesiumRoutes  = {};   // routeId    → [entities]
+let pickMode = false;
+let pickCB   = null;
+
+function initCesium() {
+  const creditDiv = document.createElement('div');
+  viewer = new Cesium.Viewer('cesiumContainer', {
+    baseLayer            : false,
+    baseLayerPicker      : false,
+    geocoder             : false,
+    homeButton           : false,
+    sceneModePicker      : false,
+    navigationHelpButton : false,
+    animation            : false,
+    timeline             : false,
+    fullscreenButton     : false,
+    infoBox              : false,
+    selectionIndicator   : false,
+    creditContainer      : creditDiv,
+    terrainProvider      : new Cesium.EllipsoidTerrainProvider(),
+    skyBox               : false,
+    skyAtmosphere        : false,
+  });
+
+  /* terrainProvider 옵션이 무시될 경우를 대비해 생성 후에도 명시적 재설정 */
+  viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+  /* Cesium 에러 다이얼로그 억제 — Ion/네트워크 오류 팝업 숨김 */
+  viewer.cesiumWidget.showRenderLoopErrors = false;
+
+  viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0a0a1a');
+  viewer.scene.globe.undergroundColor = Cesium.Color.fromCssColorString('#0a0a1a');
+  viewer.scene.globe.enableLighting = false;
+  viewer.scene.globe.showGroundAtmosphere = false;
+
+  /* 타일 로딩 성능 최적화 */
+  viewer.scene.globe.tileCacheSize            = 1000;  // 기본값 100 → 메모리 캐시 확대
+  viewer.scene.globe.maximumScreenSpaceError  = 4;     // 기본값 2 → 한 번에 로드하는 타일 수 절반으로 감소
+  viewer.scene.globe.preloadSiblings          = true;  // 인접 타일 선제 로드
+  Cesium.RequestScheduler.maximumRequestsPerServer = 18; // 서버당 동시 요청 상한
+
+  /* OSM 타일 로드 — 실패 시 ArcGIS 폴백 */
+  viewer.imageryLayers.removeAll();
+  loadTiles();
+
+  /* 카메라 초기화 및 이벤트 핸들러 설정 */
+  _initCesiumEvents();
+}
+
+function loadTiles() {
+  /* CARTO Voyager — OSM 데이터 기반, User-Agent 제한 없음, API 키 불필요 */
+  try {
+    viewer.imageryLayers.addImageryProvider(
+      new Cesium.UrlTemplateImageryProvider({
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+        subdomains: 'abcd',
+        maximumLevel: 19,
+        credit: '© OpenStreetMap contributors © CARTO'
+      })
+    );
+    return;
+  } catch(e) { console.warn('CARTO 타일 실패, ArcGIS 폴백:', e); }
+  /* 폴백: ArcGIS World Street Map */
+  addArcGISTiles();
+}
+
+function addArcGISTiles() {
+  const arcUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer';
+  try {
+    if (typeof Cesium.ArcGisMapServerImageryProvider.fromUrl === 'function') {
+      Cesium.ArcGisMapServerImageryProvider.fromUrl(arcUrl)
+        .then(p => viewer.imageryLayers.addImageryProvider(p))
+        .catch(e => console.warn('ArcGIS 타일 로드 실패:', e));
+    } else {
+      viewer.imageryLayers.addImageryProvider(
+        new Cesium.ArcGisMapServerImageryProvider({ url: arcUrl })
+      );
+    }
+  } catch(e) { console.warn('모든 타일 서버 실패:', e); }
+}
+
+function addOSMLegacy() {
+  try {
+    viewer.imageryLayers.addImageryProvider(
+      new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' })
+    );
+  } catch(e) { console.warn('OSM 타일 로드 실패:', e); }
+}
+
+function _initCesiumEvents() {
+
+  /* 초기 카메라 */
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(127, 37, 18000000)
+  });
+
+  /* 이벤트 핸들러 */
+  const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+  /* 클릭 */
+  handler.setInputAction(ev => {
+    if (pickMode) {
+      const cart = viewer.camera.pickEllipsoid(ev.position, viewer.scene.globe.ellipsoid);
+      if (cart) {
+        const c = Cesium.Cartographic.fromCartesian(cart);
+        pickCB && pickCB(
+          Cesium.Math.toDegrees(c.latitude),
+          Cesium.Math.toDegrees(c.longitude)
+        );
+      }
+      return;
+    }
+    const pk = viewer.scene.pick(ev.position);
+    if (pk?.id?._locId) openPhotoPanel(pk.id._locId);
+    document.getElementById('ctxMenu').style.display = 'none';
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  /* 우클릭 */
+  handler.setInputAction(ev => {
+    const pk = viewer.scene.pick(ev.position);
+    if (pk?.id?._locId) {
+      ctxLocId = pk.id._locId;
+      const m = document.getElementById('ctxMenu');
+      m.style.display = 'block';
+      m.style.left = ev.position.x + 'px';
+      m.style.top  = ev.position.y + 'px';
+    }
+  }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+
+  /* 마우스 이동 — 툴팁 */
+  handler.setInputAction(ev => {
+    const pk = viewer.scene.pick(ev.endPosition);
+    const tt = document.getElementById('tooltip');
+    if (pk?.id?._tip) {
+      tt.textContent = pk.id._tip;
+      tt.style.display = 'block';
+      tt.style.left = (ev.endPosition.x + 14) + 'px';
+      tt.style.top  = (ev.endPosition.y - 8) + 'px';
+    } else { tt.style.display = 'none'; }
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+}
+
+/* ──────────────────────────────────────────
+   마커 캔버스 생성 (글로우 효과)
+────────────────────────────────────────── */
+function markerCanvas(scale = 1, hex = '#4fc3f7') {
+  /* hex → rgb 분해 */
+  const pr = parseInt(hex.slice(1,3),16)||79;
+  const pg = parseInt(hex.slice(3,5),16)||195;
+  const pb = parseInt(hex.slice(5,7),16)||247;
+  const rgba  = a => `rgba(${pr},${pg},${pb},${a})`;
+  const light = `rgb(${Math.min(255,pr+55)},${Math.min(255,pg+55)},${Math.min(255,pb+55)})`;
+  const dark  = `rgb(${Math.max(0,pr-55)},${Math.max(0,pg-55)},${Math.max(0,pb-55)})`;
+
+  const sz = Math.round(56 * scale);
+  const cvs = document.createElement('canvas');
+  cvs.width = cvs.height = sz;
+  const ctx = cvs.getContext('2d');
+  const cx = sz / 2, mr = sz * 0.27;
+
+  /* 바깥 펄스 링 3단계 */
+  [2.2, 1.75, 1.38].forEach((m, i) => {
+    ctx.beginPath(); ctx.arc(cx, cx, mr*m, 0, Math.PI*2);
+    ctx.strokeStyle = rgba([.06,.14,.28][i]);
+    ctx.lineWidth = 1.5; ctx.stroke();
+  });
+
+  /* 글로우 헤일로 */
+  const glow = ctx.createRadialGradient(cx, cx, 0, cx, cx, mr*1.9);
+  glow.addColorStop(0, rgba(.5)); glow.addColorStop(1, rgba(0));
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, sz, sz);
+
+  /* 3D 구체 — 메인 그라디언트 */
+  const mg = ctx.createRadialGradient(cx-mr*.38, cx-mr*.42, mr*.04, cx, cx, mr);
+  mg.addColorStop(0, light); mg.addColorStop(0.5, hex); mg.addColorStop(1, dark);
+  ctx.beginPath(); ctx.arc(cx, cx, mr, 0, Math.PI*2); ctx.fillStyle = mg; ctx.fill();
+
+  /* 아래쪽 깊이감 그림자 */
+  const sh = ctx.createRadialGradient(cx, cx+mr*.42, 0, cx, cx, mr);
+  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,10,40,.45)');
+  ctx.beginPath(); ctx.arc(cx, cx, mr, 0, Math.PI*2); ctx.fillStyle = sh; ctx.fill();
+
+  /* 왼쪽 상단 반사광 */
+  const hl = ctx.createRadialGradient(cx-mr*.44, cx-mr*.46, 0, cx-mr*.2, cx-mr*.2, mr*.74);
+  hl.addColorStop(0, 'rgba(255,255,255,.8)');
+  hl.addColorStop(.5, 'rgba(255,255,255,.18)');
+  hl.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.arc(cx, cx, mr, 0, Math.PI*2); ctx.fillStyle = hl; ctx.fill();
+
+  /* 중앙 스페큘러 포인트 */
+  ctx.beginPath(); ctx.arc(cx, cx, mr*.11, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.fill();
+
+  return cvs;
+}
+
+/* ──────────────────────────────────────────
+   마커 관리
+────────────────────────────────────────── */
+function addMarker(loc) {
+  if (cesiumMarkers[loc.id]) viewer.entities.remove(cesiumMarkers[loc.id]);
+
+  const photos = app.photos.filter(p => p.locationId === loc.id).length;
+  const scale  = Math.min(1.6, 0.8 + photos * 0.08);
+
+  const entity = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(loc.lng, loc.lat),
+    billboard: {
+      image               : markerCanvas(scale),
+      width               : 56 * scale,
+      height              : 56 * scale,
+      verticalOrigin      : Cesium.VerticalOrigin.BOTTOM,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+    label: {
+      text             : loc.name,
+      font             : '12px Noto Sans KR, sans-serif',
+      fillColor        : Cesium.Color.fromCssColorString('#e8eaf6'),
+      outlineColor     : Cesium.Color.fromCssColorString('#0a0a1a'),
+      outlineWidth     : 3,
+      style            : Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin   : Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset      : new Cesium.Cartesian2(0, -58 * scale),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      showBackground   : true,
+      backgroundColor  : Cesium.Color.fromCssColorString('rgba(10,10,30,.75)'),
+      backgroundPadding: new Cesium.Cartesian2(5, 3),
+    }
+  });
+
+  /* Cesium Entity 생성자는 비표준 속성을 복사하지 않으므로 생성 후 직접 설정 */
+  entity._locId = loc.id;
+  entity._tip   = `${loc.name}${loc.visitDate ? '  (' + loc.visitDate + ')' : ''}`;
+
+  cesiumMarkers[loc.id] = entity;
+}
+
+function removeMarker(id) {
+  if (cesiumMarkers[id]) { viewer.entities.remove(cesiumMarkers[id]); delete cesiumMarkers[id]; }
+}
+
+function flyTo(loc) {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(loc.lng, loc.lat, 2500000),
+    duration: 1.8
+  });
+}
+
+/* ──────────────────────────────────────────
+   대원 곡선 계산
+────────────────────────────────────────── */
+function greatCircle(lat1, lng1, lat2, lng2, n = 80) {
+  const D2R = Math.PI / 180;
+  const positions = [];
+  const arcH = Math.min(dist(lat1, lng1, lat2, lng2) * 180, 2500000);
+
+  const la1 = lat1*D2R, lo1 = lng1*D2R, la2 = lat2*D2R, lo2 = lng2*D2R;
+  const d = 2 * Math.asin(Math.sqrt(
+    Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2
+  ));
+
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let lat, lng;
+
+    if (d < 1e-6) { lat = lat1; lng = lng1; }
+    else {
+      const A = Math.sin((1-t)*d)/Math.sin(d), B = Math.sin(t*d)/Math.sin(d);
+      const x = A*Math.cos(la1)*Math.cos(lo1) + B*Math.cos(la2)*Math.cos(lo2);
+      const y = A*Math.cos(la1)*Math.sin(lo1) + B*Math.cos(la2)*Math.sin(lo2);
+      const z = A*Math.sin(la1)               + B*Math.sin(la2);
+      lat = Math.atan2(z, Math.sqrt(x*x + y*y)) / D2R;
+      lng = Math.atan2(y, x) / D2R;
+    }
+
+    const h = arcH * Math.sin(t * Math.PI);
+    positions.push(Cesium.Cartesian3.fromDegrees(lng, lat, h));
+  }
+  return positions;
+}
+
+/* ──────────────────────────────────────────
+   교통수단 설정
+────────────────────────────────────────── */
+const TP = {
+  airplane: { color:'#4fc3f7', emoji:'✈️', name:'비행기' },
+  car      : { color:'#ffa726', emoji:'🚗', name:'자동차' },
+  train    : { color:'#66bb6a', emoji:'🚆', name:'기차'   },
+  bus      : { color:'#42a5f5', emoji:'🚌', name:'버스'   },
+  bicycle  : { color:'#ffee58', emoji:'🚴', name:'자전거' },
+  walk     : { color:'#eeeeee', emoji:'🚶', name:'도보'   },
+  ship     : { color:'#ab47bc', emoji:'🚢', name:'배/크루즈' },
+};
+
+/* ──────────────────────────────────────────
+   교통수단 아이콘 (canvas + 이모지)
+────────────────────────────────────────── */
+const _iconCache = {};
+const _emojiMap = { airplane:'✈', car:'🚗', train:'🚆', bus:'🚌', bicycle:'🚴', walk:'🚶', ship:'🚢' };
+
+function transportIcon(type, color) {
+  const key = type + color;
+  if (_iconCache[key]) return _iconCache[key];
+  const S = 72, r = S / 2 - 4;
+  const cvs = document.createElement('canvas');
+  cvs.width = cvs.height = S;
+  const ctx = cvs.getContext('2d');
+  ctx.shadowColor = color; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.arc(S/2, S/2, r, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(5,10,25,0.92)'; ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = color; ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.arc(S/2, S/2, r, 0, Math.PI*2); ctx.stroke();
+  ctx.font = '32px "Segoe UI Emoji","Apple Color Emoji",serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(_emojiMap[type] || '✈', S/2, S/2 + 2);
+  _iconCache[key] = cvs;
+  return cvs;
+}
+
+function endpointMarker(lng, lat, name) {
+  const sc = 0.8;
+  const e = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(lng, lat),
+    billboard: {
+      image: markerCanvas(sc),
+      width: 56 * sc, height: 56 * sc,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY
+    },
+    label: {
+      text: name,
+      font: '12px Noto Sans KR, sans-serif',
+      fillColor: Cesium.Color.fromCssColorString('#e8eaf6'),
+      outlineColor: Cesium.Color.fromCssColorString('#0a0a1a'),
+      outlineWidth: 3,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -50),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      showBackground: true,
+      backgroundColor: Cesium.Color.fromCssColorString('rgba(10,10,30,.75)'),
+      backgroundPadding: new Cesium.Cartesian2(5, 3)
+    }
+  });
+  return e;
+}
+
+/* ──────────────────────────────────────────
+   경로 렌더링
+────────────────────────────────────────── */
+function addRoute(route) {
+  removeRouteEntities(route.id);
+  const entities = [];
+  const tp  = TP[route.transport] || TP.car;
+  const cc  = Cesium.Color.fromCssColorString(tp.color);
+  const tip = `${route.fromName} → ${route.toName}  |  ${tp.emoji}  |  ${route.date || ''}`;
+  const iconUrl = transportIcon(route.transport, tp.color);
+
+  if (route.transport === 'airplane') {
+    const pts = greatCircle(route.fromLat, route.fromLng, route.toLat, route.toLng, 100);
+
+    /* 대원 곡선 경로 선 (점선) */
+    const arcLine = viewer.entities.add({
+      polyline: {
+        positions: pts,
+        width    : 2,
+        material : new Cesium.PolylineDashMaterialProperty({ color: cc.withAlpha(0.6), dashLength: 20 }),
+        clampToGround: false,
+        arcType  : Cesium.ArcType.NONE
+      }
+    });
+    arcLine._routeId = route.id; arcLine._tip = tip;
+    entities.push(arcLine);
+
+    /* 비행기 아이콘 애니메이션 */
+    const startMs = Date.now(), period = 50000;
+    const plane = viewer.entities.add({
+      position: new Cesium.CallbackProperty(() => {
+        const t = ((Date.now() - startMs) % period) / period;
+        const idx = Math.min(Math.floor(t * pts.length), pts.length - 2);
+        return Cesium.Cartesian3.lerp(pts[idx], pts[idx+1], t * pts.length - idx, new Cesium.Cartesian3());
+      }, false),
+      billboard: {
+        image: iconUrl, width: 48, height: 48,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        eyeOffset: new Cesium.Cartesian3(0, 0, -80000),
+        rotation: new Cesium.CallbackProperty(() => {
+          const t = ((Date.now() - startMs) % period) / period;
+          const idx = Math.min(Math.floor(t * pts.length), pts.length - 2);
+          const dir = Cesium.Cartesian3.subtract(pts[idx+1], pts[idx], new Cesium.Cartesian3());
+          return -Math.atan2(dir.y, dir.x);
+        }, false),
+        alignedAxis: Cesium.Cartesian3.UNIT_Z
+      }
+    });
+    plane._routeId = route.id; plane._tip = tip;
+    entities.push(plane);
+
+  } else {
+    /* 지상 교통 경로 선 */
+    const pts = [
+      Cesium.Cartesian3.fromDegrees(route.fromLng, route.fromLat, 5000),
+      Cesium.Cartesian3.fromDegrees(route.toLng,   route.toLat,   5000)
+    ];
+    const dashed = ['train','walk','bicycle'].includes(route.transport);
+    const groundLine = viewer.entities.add({
+      polyline: {
+        positions: pts, width: 2.5,
+        material : dashed
+          ? new Cesium.PolylineDashMaterialProperty({ color: cc.withAlpha(0.8), dashLength: 16 })
+          : new Cesium.ColorMaterialProperty(cc.withAlpha(0.8)),
+        clampToGround: false, arcType: Cesium.ArcType.NONE
+      }
+    });
+    groundLine._routeId = route.id; groundLine._tip = tip;
+    entities.push(groundLine);
+
+    /* 교통수단 아이콘 (중간 지점) */
+    const midLat = (route.fromLat + route.toLat) / 2;
+    const midLng = (route.fromLng + route.toLng) / 2;
+    const iconE = viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(midLng, midLat, 5000),
+      billboard: {
+        image: iconUrl, width: 44, height: 44,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        eyeOffset: new Cesium.Cartesian3(0, 0, -80000)
+      }
+    });
+    iconE._routeId = route.id; iconE._tip = tip;
+    entities.push(iconE);
+  }
+
+  /* 출발/도착 마커 */
+  const fromE = endpointMarker(route.fromLng, route.fromLat, route.fromName);
+  fromE._routeId = route.id; entities.push(fromE);
+  const toE = endpointMarker(route.toLng, route.toLat, route.toName);
+  toE._routeId = route.id; entities.push(toE);
+
+  cesiumRoutes[route.id] = entities;
+}
+
+function removeRouteEntities(id) {
+  (cesiumRoutes[id] || []).forEach(e => viewer.entities.remove(e));
+  delete cesiumRoutes[id];
+}
+
+/* ──────────────────────────────────────────
+   장소 목록 렌더링
+────────────────────────────────────────── */
+function renderLocs() {
+  const el = document.getElementById('locList');
+  if (!app.locations.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">🗺️</div><p>아직 방문한 지역이 없습니다.<br>지역을 추가하여 여행을 기록하세요!</p></div>';
+    return;
+  }
+  el.innerHTML = app.locations.map(l => `
+    <div class="loc-item" onclick="flyTo(app.locations.find(x=>x.id==='${l.id}'))">
+      <div class="loc-dot"></div>
+      <div class="loc-info">
+        <div class="loc-name">${l.name}</div>
+        <div class="loc-date">${l.visitDate||'날짜 없음'} · 사진 ${app.photos.filter(p=>p.locationId===l.id).length}장</div>
+      </div>
+      <div class="loc-actions">
+        <button class="ico-btn" onclick="event.stopPropagation();openLocModal('${l.id}')" title="편집">✏️</button>
+        <button class="ico-btn" onclick="event.stopPropagation();delLoc('${l.id}')" title="삭제">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ──────────────────────────────────────────
+   장소 모달
+────────────────────────────────────────── */
+let editLocId = null;
+
+function openLocModal(id = null) {
+  editLocId = id;
+  const loc = id ? app.locations.find(l => l.id === id) : null;
+  document.getElementById('locModalTitle').textContent = id ? '지역 편집' : '지역 추가';
+  document.getElementById('mName').value = loc?.name     || '';
+  document.getElementById('mLat' ).value = loc?.lat      || '';
+  document.getElementById('mLng' ).value = loc?.lng      || '';
+  document.getElementById('mDate').value = loc?.visitDate || new Date().toISOString().split('T')[0];
+  document.getElementById('mMemo').value = loc?.memo     || '';
+  document.getElementById('mNameAC').style.display = 'none';
+  document.getElementById('locModal').classList.add('open');
+}
+
+function closeLocModal() {
+  document.getElementById('locModal').classList.remove('open');
+  exitPick();
+}
+
+function saveLoc() {
+  const name = document.getElementById('mName').value.trim();
+  const lat  = parseFloat(document.getElementById('mLat').value);
+  const lng  = parseFloat(document.getElementById('mLng').value);
+  if (!name || isNaN(lat) || isNaN(lng)) { toast('지역명, 위도, 경도를 입력하세요.', 'error'); return; }
+
+  const loc = {
+    id       : editLocId || uid(),
+    name, lat, lng,
+    visitDate: document.getElementById('mDate').value || null,
+    memo     : document.getElementById('mMemo').value.trim(),
+    photos   : editLocId ? (app.locations.find(l=>l.id===editLocId)?.photos||[]) : []
+  };
+
+  if (editLocId) {
+    const i = app.locations.findIndex(l => l.id === editLocId);
+    app.locations[i] = loc;
+  } else {
+    app.locations.push(loc);
+  }
+
+  saveData(); addMarker(loc); renderLocs(); updateStats();
+  closeLocModal();
+  if (app.settings.showLocToast !== false) toast(`📍 ${name}`, 'success');
+  flyTo(loc);
+}
+
+function delLoc(id) {
+  const loc = app.locations.find(l => l.id === id);
+  if (!loc || !confirm(`"${loc.name}"을 삭제하시겠습니까?`)) return;
+  app.photos    = app.photos.filter(p => p.locationId !== id);
+  app.locations = app.locations.filter(l => l.id !== id);
+  removeMarker(id);
+  saveData(); renderLocs(); updateStats();
+  toast('삭제 완료', 'success');
+}
+
+/* ── 좌표 선택 모드 ── */
+function enterPick(cb) {
+  pickMode = true; pickCB = cb;
+  document.getElementById('pickNotice').style.display = 'block';
+  document.getElementById('locModal').classList.remove('open');
+}
+function exitPick() {
+  pickMode = false; pickCB = null;
+  document.getElementById('pickNotice').style.display = 'none';
+}
+
+/* ──────────────────────────────────────────
+   사진 패널
+────────────────────────────────────────── */
+let curLocId   = null;
+let lbPhotos   = [];
+let lbIndex    = 0;
+
+function openPhotoPanel(locId) {
+  const loc = app.locations.find(l => l.id === locId);
+  if (!loc) return;
+  curLocId = locId;
+  document.getElementById('ppTitle').textContent = `📷 ${loc.name} — 사진`;
+  document.getElementById('photoPanel').classList.add('open');
+  renderPhotos();
+}
+
+function closePhotoPanel() {
+  document.getElementById('photoPanel').classList.remove('open');
+  curLocId = null;
+}
+
+function renderPhotos() {
+  const photos = app.photos.filter(p => p.locationId === curLocId);
+  lbPhotos = photos;
+  const grid = document.getElementById('photoGrid');
+  grid.innerHTML = `
+    <div class="photo-add" onclick="document.getElementById('photoInput').click()">
+      <span>+</span><span>사진 추가</span>
+    </div>
+    ${photos.map((p,i) => `
+      <img src="${p.base64}" class="photo-thumb" alt="${p.fileName||''}"
+           onclick="openLB(${i})" title="${p.fileName||''}">
+    `).join('')}
+  `;
+}
+
+async function addPhotos(files) {
+  if (!curLocId) return;
+  for (const f of files) {
+    const b64 = await toBase64(f);
+    const ph  = { id: uid(), locationId: curLocId, base64: b64, fileName: f.name, takenAt: null, memo: '' };
+    try {
+      const ex = await exifr.parse(f, ['DateTimeOriginal']);
+      if (ex?.DateTimeOriginal) ph.takenAt = ex.DateTimeOriginal.toISOString();
+    } catch {}
+    app.photos.push(ph);
+    const loc = app.locations.find(l => l.id === curLocId);
+    if (loc) { loc.photos = loc.photos||[]; loc.photos.push(ph.id); }
+  }
+  saveData(); renderPhotos(); renderLocs(); updateStats();
+  toast(`${files.length}장 저장 완료!`, 'success');
+  addMarker(app.locations.find(l => l.id === curLocId));
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  if (files.length && curLocId) addPhotos(files);
+}
+
+/* ── 라이트박스 ── */
+function openLB(i) {
+  lbIndex = i;
+  document.getElementById('lightbox').classList.add('open');
+  renderLB();
+}
+function renderLB() {
+  const p = lbPhotos[lbIndex];
+  if (!p) return;
+  document.getElementById('lbImg').src = p.base64;
+  document.getElementById('lbCaption').textContent =
+    `${p.fileName||'사진'} ${p.takenAt ? '· ' + new Date(p.takenAt).toLocaleDateString('ko-KR') : ''}  (${lbIndex+1}/${lbPhotos.length})`;
+}
+function closeLB() { document.getElementById('lightbox').classList.remove('open'); }
+function delPhoto() {
+  const p = lbPhotos[lbIndex]; if (!p || !confirm('이 사진을 삭제하시겠습니까?')) return;
+  app.photos = app.photos.filter(x => x.id !== p.id);
+  const loc  = app.locations.find(l => l.id === curLocId);
+  if (loc) loc.photos = (loc.photos||[]).filter(id => id !== p.id);
+  saveData(); closeLB(); renderPhotos(); renderLocs(); updateStats();
+  toast('사진 삭제 완료', 'success');
+}
+
+/* ── EXIF 위치 추가 ── */
+async function addLocFromPhoto(file) {
+  try {
+    const ex = await exifr.parse(file, { gps: true, pick: ['DateTimeOriginal'] });
+    if (ex?.latitude !== undefined) {
+      toast('GPS 좌표 발견! 역지오코딩 중...', 'info');
+      const name = await revGeo(ex.latitude, ex.longitude);
+      document.getElementById('mLat').value  = ex.latitude.toFixed(6);
+      document.getElementById('mLng').value  = ex.longitude.toFixed(6);
+      document.getElementById('mName').value = name;
+      if (ex.DateTimeOriginal)
+        document.getElementById('mDate').value = ex.DateTimeOriginal.toISOString().split('T')[0];
+      openLocModal();
+    } else {
+      toast('GPS 정보가 없습니다. 수동으로 입력해주세요.', 'error');
+      openLocModal();
+    }
+  } catch { toast('사진 분석 실패. 수동 입력해주세요.', 'error'); openLocModal(); }
+}
+
+/* ── 일괄 업로드 ── */
+async function bulkUpload(files) {
+  const bar = document.createElement('div');
+  bar.className = 'toast info';
+  bar.innerHTML = `일괄 처리 중... <div class="prog-bar" style="width:160px;margin-left:10px;"><div class="prog-fill" id="bp" style="width:0%"></div></div>`;
+  document.getElementById('toastWrap').appendChild(bar);
+
+  let unclassified = 0;
+  for (let i = 0; i < files.length; i++) {
+    document.getElementById('bp').style.width = `${((i+1)/files.length)*100}%`;
+    try {
+      const ex = await exifr.parse(files[i], { gps: true });
+      const b64 = await toBase64(files[i]);
+      const ph  = { id: uid(), locationId: null, base64: b64, fileName: files[i].name, takenAt: null, memo: '' };
+
+      if (ex?.latitude !== undefined) {
+        const near = app.locations.find(l => dist(ex.latitude, ex.longitude, l.lat, l.lng) <= 50);
+        if (near) {
+          ph.locationId = near.id;
+          app.photos.push(ph);
+          near.photos = near.photos||[]; near.photos.push(ph.id);
+        } else {
+          ph.locationId = '__unclassified__';
+          app.photos.push(ph);
+          unclassified++;
+        }
+      } else {
+        ph.locationId = '__unclassified__';
+        app.photos.push(ph);
+        unclassified++;
+      }
+    } catch {}
+  }
+
+  saveData(); renderLocs(); updateStats(); bar.remove();
+  toast(`${files.length - unclassified}장 자동 분류${unclassified ? `, ${unclassified}장 미분류` : ''}`, unclassified ? 'info' : 'success');
+  if (curLocId) renderPhotos();
+}
+
+/* ──────────────────────────────────────────
+   경로 목록 렌더링
+────────────────────────────────────────── */
+function renderRoutes() {
+  const el = document.getElementById('routeList');
+  if (!app.routes.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">🗺️</div><p>아직 등록된 경로가 없습니다.</p></div>';
+    return;
+  }
+  el.innerHTML = app.routes.map(r => {
+    const tp = TP[r.transport]||TP.car;
+    return `
+    <div class="route-item">
+      <span class="route-ico">${tp.emoji}</span>
+      <div class="route-info">
+        <div class="route-name">${r.fromName} → ${r.toName}</div>
+        <div class="route-detail">${r.date||'날짜 없음'}${r.transportDetail?.airline?' · '+r.transportDetail.airline:''}</div>
+      </div>
+      <div style="display:flex;gap:3px;">
+        <button class="ico-btn" onclick="openRouteModal('${r.id}')" title="편집">✏️</button>
+        <button class="ico-btn" onclick="toggleRoute('${r.id}')" title="숨김/표시">👁</button>
+        <button class="ico-btn" onclick="delRoute('${r.id}')" title="삭제">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ──────────────────────────────────────────
+   경로 모달
+────────────────────────────────────────── */
+let selTp = 'airplane';
+let editRouteId = null;
+
+function openRouteModal(id = null) {
+  editRouteId = id;
+  const route = id ? app.routes.find(r => r.id === id) : null;
+  selTp = route?.transport || 'airplane';
+  document.querySelectorAll('.tp-btn').forEach(b => b.classList.remove('sel'));
+  document.querySelector(`[data-t="${selTp}"]`).classList.add('sel');
+  document.getElementById('routeModalTitle').textContent = id ? '경로 편집' : '경로 추가';
+  document.getElementById('rFrom').value    = route?.fromName || '';
+  document.getElementById('rTo').value      = route?.toName   || '';
+  document.getElementById('rFromLat').value = route?.fromLat  || '';
+  document.getElementById('rFromLng').value = route?.fromLng  || '';
+  document.getElementById('rToLat').value   = route?.toLat    || '';
+  document.getElementById('rToLng').value   = route?.toLng    || '';
+  document.getElementById('rDate').value    = route?.date || new Date().toISOString().split('T')[0];
+  document.getElementById('td1').value      = route?.transportDetail?.airline || route?.transportDetail?.route || route?.transportDetail?.memo || '';
+  document.getElementById('td2').value      = route?.transportDetail?.flightNo || '';
+  document.getElementById('fromAC').style.display = 'none';
+  document.getElementById('toAC').style.display   = 'none';
+  updateTpDetail(selTp);
+  document.getElementById('routeModal').classList.add('open');
+}
+
+function closeRouteModal() {
+  document.getElementById('routeModal').classList.remove('open');
+  ['fromAC','toAC'].forEach(id => document.getElementById(id).style.display = 'none');
+}
+
+function updateTpDetail(t) {
+  const d = document.getElementById('tpDetail');
+  const g2 = document.getElementById('tdG2');
+  if (t === 'airplane') {
+    d.style.display='block'; g2.style.display='';
+    document.getElementById('tdL1').textContent='항공사';
+    document.getElementById('td1').placeholder='예: Korean Air';
+    document.getElementById('tdL2').textContent='편명';
+    document.getElementById('td2').placeholder='예: KE651';
+  } else if (t === 'train') {
+    d.style.display='block'; g2.style.display='none';
+    document.getElementById('tdL1').textContent='노선명';
+    document.getElementById('td1').placeholder='예: KTX 경부선';
+  } else {
+    d.style.display='block'; g2.style.display='none';
+    document.getElementById('tdL1').textContent='메모';
+    document.getElementById('td1').placeholder='추가 정보';
+  }
+}
+
+async function saveRoute() {
+  const fromName = document.getElementById('rFrom').value.trim();
+  const toName   = document.getElementById('rTo').value.trim();
+  const fromLat  = parseFloat(document.getElementById('rFromLat').value);
+  const fromLng  = parseFloat(document.getElementById('rFromLng').value);
+  const toLat    = parseFloat(document.getElementById('rToLat').value);
+  const toLng    = parseFloat(document.getElementById('rToLng').value);
+
+  if (!fromName || !toName || isNaN(fromLat) || isNaN(toLat))
+    { toast('출발지와 도착지를 검색 후 선택하세요.', 'error'); return; }
+
+  const detail = {};
+  if (selTp === 'airplane')    { detail.airline = document.getElementById('td1').value.trim(); detail.flightNo = document.getElementById('td2').value.trim(); }
+  else if (selTp === 'train')  { detail.route   = document.getElementById('td1').value.trim(); }
+  else                         { detail.memo    = document.getElementById('td1').value.trim(); }
+
+  const route = {
+    id: editRouteId || uid(), fromName, toName,
+    fromLat, fromLng, toLat, toLng,
+    transport: selTp, transportDetail: detail,
+    date: document.getElementById('rDate').value || null,
+    color: (TP[selTp]||TP.car).color, visible: true
+  };
+
+  if (editRouteId) {
+    const i = app.routes.findIndex(r => r.id === editRouteId);
+    if (i >= 0) app.routes[i] = route;
+    removeRouteEntities(editRouteId);
+  } else {
+    app.routes.push(route);
+  }
+  saveData(); addRoute(route); renderRoutes(); updateStats();
+  closeRouteModal();
+  toast(`${fromName} → ${toName} 경로 ${editRouteId ? '수정' : '추가'} 완료!`, 'success');
+}
+
+function toggleRoute(id) {
+  const r = app.routes.find(x => x.id === id); if (!r) return;
+  r.visible = !r.visible;
+  (cesiumRoutes[id]||[]).forEach(e => { e.show = r.visible; });
+  saveData();
+}
+
+function delRoute(id) {
+  const r = app.routes.find(x => x.id === id);
+  if (!r || !confirm(`"${r.fromName} → ${r.toName}" 경로를 삭제하시겠습니까?`)) return;
+  app.routes = app.routes.filter(x => x.id !== id);
+  removeRouteEntities(id);
+  saveData(); renderRoutes(); updateStats();
+  toast('경로 삭제 완료', 'success');
+}
+
+/* ── 자동완성 ── */
+const acTimer = {};
+async function acSearch(inputId, listId, latId, lngId) {
+  const q = document.getElementById(inputId).value.trim();
+  const list = document.getElementById(listId);
+  if (q.length < 2) { list.style.display = 'none'; return; }
+  clearTimeout(acTimer[inputId]);
+  acTimer[inputId] = setTimeout(async () => {
+    const res = await geoSearch(q);
+    if (!res.length) { list.style.display = 'none'; return; }
+    list.innerHTML = res.slice(0,7).map(r => {
+      const parts = r.display_name.split(',').map(s => s.trim()).filter(Boolean);
+      const label = parts.slice(0, 3).join(', ');
+      const sub   = parts.slice(3, 5).join(', ');
+      return `<div class="ac-item" onclick="pickAC('${esc(parts[0])}',${r.lat},${r.lon},'${inputId}','${listId}','${latId}','${lngId}')">
+        <div style="font-size:13px;color:#e0e0e0">${label}</div>
+        ${sub ? `<div style="font-size:11px;color:#888;margin-top:2px">${sub}</div>` : ''}
+      </div>`;
+    }).join('');
+    list.style.display = 'block';
+  }, 200);
+}
+
+function pickAC(label, lat, lon, inpId, lstId, latId, lngId) {
+  document.getElementById(inpId).value = label;
+  document.getElementById(latId).value = lat;
+  document.getElementById(lngId).value = lon;
+  document.getElementById(lstId).style.display = 'none';
+}
+
+function esc(s) { return s.replace(/'/g,"\\'"); }
+
+/* ──────────────────────────────────────────
+   통계
+────────────────────────────────────────── */
+function updateStats() {
+  const locs   = app.locations;
+  const routes = app.routes;
+  const photos = app.photos;
+
+  document.getElementById('sCities').textContent = locs.length;
+  document.getElementById('sPhotos').textContent = photos.filter(p=>p.locationId!=='__unclassified__').length;
+
+  const totalDist = routes.reduce((s,r) => s + dist(r.fromLat,r.fromLng,r.toLat,r.toLng), 0);
+  document.getElementById('sDist').textContent = Math.round(totalDist).toLocaleString() + ' km';
+
+  /* 교통수단 */
+  const tpCount = {};
+  routes.forEach(r => { tpCount[r.transport] = (tpCount[r.transport]||0)+1; });
+  const tpEl = document.getElementById('tpStats');
+  tpEl.innerHTML = Object.keys(tpCount).length
+    ? `<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;">교통수단별 이동</div>` +
+      Object.entries(tpCount).map(([t,c]) =>
+        `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+           <span>${(TP[t]||TP.car).emoji}</span>
+           <span style="font-size:12px;flex:1;">${(TP[t]||TP.car).name}</span>
+           <span class="badge">${c}회</span>
+         </div>`).join('')
+    : '';
+
+  /* 연도 타임라인 */
+  const byYear = {};
+  locs.forEach(l => { if(l.visitDate){ const y=l.visitDate.split('-')[0]; byYear[y]=(byYear[y]||0)+1; } });
+  const yrEl = document.getElementById('yearLine');
+  const maxCnt = Math.max(...Object.values(byYear), 1);
+  yrEl.innerHTML = Object.keys(byYear).length
+    ? `<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;">연도별 방문</div>` +
+      Object.entries(byYear).sort().map(([y,c]) =>
+        `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+           <span style="font-size:12px;color:var(--txt2);width:36px;">${y}</span>
+           <div style="flex:1;background:var(--border);border-radius:3px;height:5px;">
+             <div style="width:${(c/maxCnt*100).toFixed(0)}%;height:100%;background:var(--accent);border-radius:3px;"></div>
+           </div>
+           <span class="badge">${c}</span>
+         </div>`).join('')
+    : '';
+}
+
+/* ──────────────────────────────────────────
+   이벤트 바인딩
+────────────────────────────────────────── */
+let ctxLocId = null;
+
+function bindEvents() {
+  /* 사이드바 토글 */
+  document.getElementById('sbToggle').onclick = () => {
+    const sb = document.getElementById('sidebar');
+    sb.classList.toggle('collapsed');
+    document.getElementById('sbToggle').textContent = sb.classList.contains('collapsed') ? '▶' : '◀';
+  };
+
+  /* 탭 */
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.tab-body').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById('tab-'+b.dataset.tab).classList.add('active');
+    };
+  });
+
+  /* 장소 */
+  document.getElementById('addLocBtn').onclick    = () => openLocModal();
+  document.getElementById('addPhotoLocBtn').onclick = () => document.getElementById('exifInput').click();
+  document.getElementById('exifInput').onchange  = async e => {
+    if (e.target.files[0]) await addLocFromPhoto(e.target.files[0]);
+    e.target.value = '';
+  };
+  document.getElementById('locSave').onclick   = saveLoc;
+  document.getElementById('locCancel').onclick = closeLocModal;
+  document.getElementById('locModal').onclick  = e => { if(e.target===document.getElementById('locModal')) closeLocModal(); };
+
+  /* 좌표 선택 */
+  document.getElementById('pickBtn').onclick = () => {
+    enterPick(async (lat,lng) => {
+      document.getElementById('mLat').value = lat.toFixed(6);
+      document.getElementById('mLng').value = lng.toFixed(6);
+      if (!document.getElementById('mName').value) {
+        toast('역지오코딩 중...', 'info');
+        document.getElementById('mName').value = await revGeo(lat,lng);
+      }
+      exitPick();
+      document.getElementById('locModal').classList.add('open');
+    });
+  };
+
+  /* 경로 */
+  document.getElementById('addRouteBtn').onclick = openRouteModal;
+  document.getElementById('routeSave').onclick   = saveRoute;
+  document.getElementById('routeCancel').onclick = closeRouteModal;
+  document.getElementById('routeModal').onclick  = e => { if(e.target===document.getElementById('routeModal')) closeRouteModal(); };
+
+  /* 교통수단 선택 */
+  document.querySelectorAll('.tp-btn').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.tp-btn').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+      selTp = b.dataset.t;
+      updateTpDetail(selTp);
+    };
+  });
+
+  /* 자동완성 */
+  document.getElementById('mName').oninput = () => acSearch('mName','mNameAC','mLat','mLng');
+  document.getElementById('rFrom').oninput = () => acSearch('rFrom','fromAC','rFromLat','rFromLng');
+  document.getElementById('rTo').oninput   = () => acSearch('rTo','toAC','rToLat','rToLng');
+
+  /* 사진 패널 */
+  document.getElementById('ppClose').onclick     = closePhotoPanel;
+  document.getElementById('photoInput').onchange = async e => {
+    if (e.target.files.length) await addPhotos(Array.from(e.target.files));
+    e.target.value = '';
+  };
+  document.getElementById('bulkBtn').onclick    = () => document.getElementById('bulkInput').click();
+  document.getElementById('bulkInput').onchange = async e => {
+    if (e.target.files.length) await bulkUpload(Array.from(e.target.files));
+    e.target.value = '';
+  };
+
+  /* 라이트박스 */
+  document.getElementById('lbClose').onclick  = closeLB;
+  document.getElementById('lbPrev').onclick   = () => { lbIndex=(lbIndex-1+lbPhotos.length)%lbPhotos.length; renderLB(); };
+  document.getElementById('lbNext').onclick   = () => { lbIndex=(lbIndex+1)%lbPhotos.length; renderLB(); };
+  document.getElementById('lbDelete').onclick = delPhoto;
+
+  /* 컨텍스트 메뉴 */
+  document.getElementById('ctxEdit').onclick   = () => { if(ctxLocId) openLocModal(ctxLocId); document.getElementById('ctxMenu').style.display='none'; };
+  document.getElementById('ctxDelete').onclick = () => { if(ctxLocId) delLoc(ctxLocId); document.getElementById('ctxMenu').style.display='none'; };
+  document.addEventListener('click', () => document.getElementById('ctxMenu').style.display='none');
+
+  /* 키보드 */
+  document.addEventListener('keydown', e => {
+    if (e.key==='Escape') { closeLB(); closeLocModal(); closeRouteModal(); exitPick(); }
+    if (document.getElementById('lightbox').classList.contains('open')) {
+      if (e.key==='ArrowLeft')  document.getElementById('lbPrev').click();
+      if (e.key==='ArrowRight') document.getElementById('lbNext').click();
+    }
+  });
+}
+
+/* ──────────────────────────────────────────
+   앱 초기화
+────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  initStars();
+  initCesium();
+  bindEvents();
+
+  /* 저장 데이터 복원 */
+  app.locations.forEach(l => addMarker(l));
+  app.routes.forEach(r => addRoute(r));
+  renderLocs();
+  renderRoutes();
+  updateStats();
+
+  /* 설정 토글 초기값 */
+  document.getElementById('toastToggle').checked = app.settings.showLocToast !== false;
+
+  toast('🌍 GlobeTravel Log에 오신 것을 환영합니다!', 'info');
+});
+</script>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📋 블로그 임베딩 가이드 (주석)
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ① 네이버 블로그 / 티스토리:
+  <iframe src="https://your-github-username.github.io/globetravel-log/"
+          width="100%" height="620" frameborder="0"
+          style="border-radius:12px;overflow:hidden;">
+  </iframe>
+  ※ 네이버는 HTTPS 주소만 허용됩니다.
+
+  ② GitHub Pages 배포 3단계:
+  1. GitHub에 새 저장소 생성 (예: globetravel-log)
+  2. index.html 파일 업로드 후 커밋
+  3. Settings → Pages → Branch: main / root 선택 → Save
+     → https://your-username.github.io/globetravel-log/ 로 접근 가능
+
+  ③ 주의사항:
+  · localStorage 용량 5MB 제한 — 사진 다수 저장 시 초과 가능 (Base64 인코딩으로 약 33% 증가)
+  · GPS 역지오코딩(Nominatim)은 인터넷 연결 필요, 분당 1회 요청 제한
+  · CesiumJS 타일 로딩도 인터넷 연결 필요
+  · 일부 블로그 플랫폼(네이버)은 iframe sandbox 제한으로 localStorage 비활성화될 수 있음
+  · GitHub Pages 배포 시 HTTPS 자동 제공으로 모든 기능 정상 동작
+-->
+
+</body>
+</html>

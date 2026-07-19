@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnostic Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        .fault-active { background-color: #ffcccc; }
+        .fault-pending { background-color: #fff3cc; }
+        .header { background-color: #333; color: white; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Vehicle Diagnostic Report</h1>
+        <p>Generated: 2026-06-18 14:18:26</p>
+    </div>
+    <h2>Vehicle Information</h2>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>VIN</td><td>1GNALDEK9FZ108495</td></tr>
+        <tr><td>Make/Model</td><td>Hyundai Sonata 2024</td></tr>
+        <tr><td>Mileage</td><td>15234 km</td></tr>
+    </table>
+    <h2>Diagnostic Trouble Codes (2 found)</h2>
+    <table>
+        <tr><th>DTC Code</th><th>Description</th><th>Status</th><th>Mileage at Fault</th></tr>
+        
+        <tr class="fault-active">
+            <td>P0420</td>
+            <td>Catalyst System Efficiency Below Threshold</td>
+            <td>CONFIRMED</td>
+            <td>15000 km</td>
+        </tr>
+        <tr class="fault-pending">
+            <td>U0100</td>
+            <td>Lost Communication with ECM/PCM</td>
+            <td>PENDING</td>
+            <td>15200 km</td>
+        </tr>
+    </table>
+    <h2>Test Summary</h2>
+    <p>Active faults: 1</p>
+    <p>Pending faults: 1</p>
+    <p>Overall status: FAIL</p>
+</body>
+</html>

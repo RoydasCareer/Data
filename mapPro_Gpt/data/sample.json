@@ -1,0 +1,108 @@
+{
+  "places": [
+    {
+      "id": "place-icn",
+      "name": "인천국제공항",
+      "country": "대한민국",
+      "lat": 37.4602,
+      "lng": 126.4407,
+      "visitDate": "2024-01-15",
+      "memo": "여행의 시작점"
+    },
+    {
+      "id": "place-bkk",
+      "name": "방콕 수완나품 공항",
+      "country": "태국",
+      "lat": 13.6811,
+      "lng": 100.7472,
+      "visitDate": "2024-01-15",
+      "memo": "비엣젯 타고 도착. 톡톡 타고 시내로"
+    },
+    {
+      "id": "place-nrt",
+      "name": "도쿄 나리타 공항",
+      "country": "일본",
+      "lat": 35.7720,
+      "lng": 140.3929,
+      "visitDate": "2024-03-10",
+      "memo": "벚꽃 시즌 방문"
+    },
+    {
+      "id": "place-cdg",
+      "name": "파리 샤를드골 공항",
+      "country": "프랑스",
+      "lat": 49.0097,
+      "lng": 2.5479,
+      "visitDate": "2024-06-05",
+      "memo": "에어프랑스 AF267"
+    },
+    {
+      "id": "place-lhr",
+      "name": "런던 히드로 공항",
+      "country": "영국",
+      "lat": 51.4700,
+      "lng": -0.4543,
+      "visitDate": "2024-06-08",
+      "memo": "유로스타로 파리에서 이동"
+    },
+    {
+      "id": "place-jfk",
+      "name": "뉴욕 JFK 공항",
+      "country": "미국",
+      "lat": 40.6413,
+      "lng": -73.7781,
+      "visitDate": "2024-08-20",
+      "memo": "브리티시 에어웨이즈 BA175"
+    }
+  ],
+  "routes": [
+    {
+      "id": "route-1",
+      "fromPlaceId": "place-icn",
+      "toPlaceId":   "place-bkk",
+      "transport":   "plane",
+      "date":        "2024-01-15",
+      "memo":        "비엣젯 VZ869 (약 6시간)"
+    },
+    {
+      "id": "route-2",
+      "fromPlaceId": "place-bkk",
+      "toPlaceId":   "place-nrt",
+      "transport":   "plane",
+      "date":        "2024-03-10",
+      "memo":        "타이항공 TG682"
+    },
+    {
+      "id": "route-3",
+      "fromPlaceId": "place-nrt",
+      "toPlaceId":   "place-cdg",
+      "transport":   "plane",
+      "date":        "2024-06-05",
+      "memo":        "에어프랑스 AF267 (12시간)"
+    },
+    {
+      "id": "route-4",
+      "fromPlaceId": "place-cdg",
+      "toPlaceId":   "place-lhr",
+      "transport":   "train",
+      "date":        "2024-06-08",
+      "memo":        "유로스타 (2시간 15분)"
+    },
+    {
+      "id": "route-5",
+      "fromPlaceId": "place-lhr",
+      "toPlaceId":   "place-jfk",
+      "transport":   "plane",
+      "date":        "2024-08-20",
+      "memo":        "British Airways BA175 (7시간)"
+    },
+    {
+      "id": "route-6",
+      "fromPlaceId": "place-jfk",
+      "toPlaceId":   "place-icn",
+      "transport":   "plane",
+      "date":        "2024-08-28",
+      "memo":        "대한항공 KE082 (14시간)"
+    }
+  ]
+}

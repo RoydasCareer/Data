@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\Z311026\\\\.claude\\\\projects\\\\C--PP-Career\\\\memory\\\\MEMORY.md\"}",
+  "error": "File does not exist. Note: your current working directory is C:\\PP\\Career.",
+  "timestamp": "2026-06-10T07:56:30.035Z",
+  "retry_count": 1
+}
